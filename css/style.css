@@ -72,3 +72,31 @@ input {
 .btn-gold { background: var(--gold); color: var(--navy); border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; }
 .btn-navy { background: var(--navy); color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
 
+
+.event-card {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    border-left: 5px solid var(--gold);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.scan-feedback {
+    margin-top: 20px;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.scan-feedback.success { background: #d4edda; color: #155724; border: 2px solid #c3e6cb; }
+.scan-feedback.info { background: #d1ecf1; color: #0c5460; border: 2px solid #bee5eb; }
+.scan-feedback.warning { background: #fff3cd; color: #856404; border: 2px solid #ffeeba; }
+
+#reader {
+    border: 4px solid var(--navy) !important;
+    border-radius: 15px;
+    overflow: hidden;
+}
+
