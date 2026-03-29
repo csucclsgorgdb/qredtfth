@@ -9,6 +9,61 @@
     
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+    <style>
+        /* Specific Dashboard Layout Styles */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+            margin-top: 24px;
+        }
+
+        .quick-actions-btns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .action-block {
+            padding: 24px !important;
+            height: auto !important;
+            text-align: left !important;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            font-weight: 600;
+            border-radius: 15px;
+            transition: transform 0.2s;
+        }
+
+        .action-block:hover { transform: translateY(-3px); }
+
+        .status-panel { background: var(--hero-navy); color: white; }
+        .status-panel h3 { color: white !important; margin-bottom: 20px; }
+
+        .status-list { display: flex; flex-direction: column; gap: 15px; }
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .tag-online {
+            background: #4ade80;
+            color: #064e3b;
+            padding: 2px 8px;
+            border-radius: 5px;
+            font-size: 0.7rem;
+            font-weight: 800;
+        }
+
+        @media (max-width: 992px) {
+            .dashboard-grid { grid-template-columns: 1fr; }
+        }
+    </style>
 </head>
 <body>
     <div class="wrapper">
@@ -88,10 +143,12 @@
                             </h3>
                             <div class="quick-actions-btns">
                                 <button class="btn-navy action-block" onclick="document.querySelector('[data-module=\'attendance\']').click()">
-                                    <i data-lucide="scan"></i><br>Scan Attendance
+                                    <i data-lucide="scan" style="width:24px; height:24px;"></i>
+                                    Scan Attendance
                                 </button>
                                 <button class="btn-gold action-block" onclick="document.querySelector('[data-module=\'finance\']').click()">
-                                    <i data-lucide="banknote"></i><br>New Payment
+                                    <i data-lucide="banknote" style="width:24px; height:24px;"></i>
+                                    New Payment
                                 </button>
                             </div>
                         </div>
@@ -119,8 +176,10 @@
         import { initFinance } from './js/finance.js';
         import { initAttendance } from './js/attendance.js';
 
-        // 1. Initial Authentication & Profile UI
+        // Initialize Authentication
         checkAuth();
+        
+        // Profile UI Data
         const userRole = localStorage.getItem('userRole') || 'Staff';
         const userEmail = localStorage.getItem('userEmail') || 'User@edu.ph';
         
@@ -132,70 +191,11 @@
             document.querySelectorAll('.admin-only').forEach(el => el.remove());
         }
 
-        // 2. The Core Controller (Module Switcher)
+        // Module Switcher Logic
         const switchModule = (moduleName) => {
-            // UI Update
             document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
             const activeLink = document.querySelector(`[data-module="${moduleName}"]`);
             if (activeLink) activeLink.classList.add('active');
 
-            // Clear Modals on Switch
-            document.getElementById('modal-root').innerHTML = '';
-
-            switch (moduleName) {
-                case 'dashboard':
-                    window.location.reload(); 
-                    break;
-                case 'students':
-                    initStudents();
-                    break;
-                case 'events':
-                    initEvents();
-                    break;
-                case 'finance':
-                    initFinance();
-                    break;
-                case 'attendance':
-                    initAttendance();
-                    break;
-                default:
-                    console.error("Module logic not found");
-            }
-
-            // Global Icon Refresh
-            setTimeout(() => lucide.createIcons(), 100);
-        };
-
-        // Event Listeners for Sidebar
-        document.querySelectorAll('.nav-link').forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                switchModule(e.currentTarget.dataset.module);
-            });
-        });
-
-        document.getElementById('logout-btn').onclick = logout;
-
-        // Daily Inspiration Utility
-        async function fetchVerse() {
-            try {
-                const res = await fetch('https://labs.bible.org/api/?passage=votd&type=json');
-                const data = await res.json();
-                document.getElementById('bible-verse').innerText = `"${data[0].text}" - ${data[0].bookname} ${data[0].chapter}:${data[0].verse}`;
-            } catch (e) { 
-                document.getElementById('bible-verse').innerText = "Walk by faith, not by sight.";
-            }
-        }
-
-        // Live Clock
-        setInterval(() => {
-            const timeEl = document.getElementById('clock');
-            if(timeEl) timeEl.innerText = new Date().toLocaleTimeString();
-        }, 1000);
-
-        // Run Initial Setup
-        fetchVerse();
-        lucide.createIcons();
-    </script>
-</body>
-</html>
+            // Reset modal root before switching modules
+            document.
