@@ -57,3 +57,18 @@ input {
 .btn-primary:hover {
     background: var(--dark-gold);
 }
+
+/* Sidebar Layout */
+.wrapper { display: flex; width: 100%; align-items: stretch; }
+#sidebar { min-width: 250px; max-width: 250px; background: var(--navy); color: #fff; min-height: 100vh; }
+#content { width: 100%; padding: 20px; min-height: 100vh; transition: all 0.3s; }
+
+/* Table Styling */
+.data-table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+.data-table th { background: var(--navy); color: var(--gold); padding: 15px; text-align: left; }
+.data-table td { padding: 12px 15px; border-bottom: 1px solid #eee; }
+
+/* Buttons */
+.btn-gold { background: var(--gold); color: var(--navy); border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+.btn-navy { background: var(--navy); color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+
