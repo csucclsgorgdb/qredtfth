@@ -4,8 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HERO OMS | Dashboard</title>
+    
     <link rel="stylesheet" href="css/style.css">
+    
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
     <div class="wrapper">
@@ -78,27 +81,27 @@
                         </div>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-top: 24px;">
+                    <div class="dashboard-grid">
                         <div class="dashboard-card">
                             <h3 style="margin-bottom: 20px; display:flex; align-items:center; gap:10px;">
                                 <i data-lucide="zap" style="color:var(--hero-gold)"></i> Quick Actions
                             </h3>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                                <button class="btn-navy" style="padding: 20px; height: auto; text-align: left;" onclick="document.querySelector('[data-module=\'attendance\']').click()">
+                            <div class="quick-actions-btns">
+                                <button class="btn-navy action-block" onclick="document.querySelector('[data-module=\'attendance\']').click()">
                                     <i data-lucide="scan"></i><br>Scan Attendance
                                 </button>
-                                <button class="btn-gold" style="padding: 20px; height: auto; text-align: left;" onclick="document.querySelector('[data-module=\'finance\']').click()">
+                                <button class="btn-gold action-block" onclick="document.querySelector('[data-module=\'finance\']').click()">
                                     <i data-lucide="banknote"></i><br>New Payment
                                 </button>
                             </div>
                         </div>
 
-                        <div class="dashboard-card" style="background: var(--hero-navy); color: white;">
-                            <h3 style="color: white; margin-bottom: 15px;">System Health</h3>
-                            <div style="font-size: 0.85rem; display: flex; flex-direction: column; gap: 10px;">
-                                <div style="display:flex; justify-content:space-between;">Database <span style="color:#4ade80">ONLINE</span></div>
-                                <div style="display:flex; justify-content:space-between;">API Gateway <span style="color:#4ade80">ACTIVE</span></div>
-                                <div style="display:flex; justify-content:space-between;">Storage <span style="color:#4ade80">98% FREE</span></div>
+                        <div class="dashboard-card status-panel">
+                            <h3>System Health</h3>
+                            <div class="status-list">
+                                <div class="status-item">Database <span class="tag-online">ONLINE</span></div>
+                                <div class="status-item">Cloud Storage <span class="tag-online">ACTIVE</span></div>
+                                <div class="status-item">Sync Speed <span class="tag-online">OPTIMAL</span></div>
                             </div>
                         </div>
                     </div>
@@ -106,6 +109,8 @@
             </div>
         </div>
     </div>
+
+    <div id="modal-root"></div>
 
     <script type="module">
         import { checkAuth, logout } from './js/auth.js';
@@ -129,9 +134,13 @@
 
         // 2. The Core Controller (Module Switcher)
         const switchModule = (moduleName) => {
+            // UI Update
             document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
             const activeLink = document.querySelector(`[data-module="${moduleName}"]`);
             if (activeLink) activeLink.classList.add('active');
+
+            // Clear Modals on Switch
+            document.getElementById('modal-root').innerHTML = '';
 
             switch (moduleName) {
                 case 'dashboard':
@@ -153,9 +162,11 @@
                     console.error("Module logic not found");
             }
 
+            // Global Icon Refresh
             setTimeout(() => lucide.createIcons(), 100);
         };
 
+        // Event Listeners for Sidebar
         document.querySelectorAll('.nav-link').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -165,6 +176,7 @@
 
         document.getElementById('logout-btn').onclick = logout;
 
+        // Daily Inspiration Utility
         async function fetchVerse() {
             try {
                 const res = await fetch('https://labs.bible.org/api/?passage=votd&type=json');
@@ -175,11 +187,13 @@
             }
         }
 
+        // Live Clock
         setInterval(() => {
             const timeEl = document.getElementById('clock');
             if(timeEl) timeEl.innerText = new Date().toLocaleTimeString();
         }, 1000);
 
+        // Run Initial Setup
         fetchVerse();
         lucide.createIcons();
     </script>
