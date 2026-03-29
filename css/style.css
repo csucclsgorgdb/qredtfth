@@ -238,3 +238,93 @@ body {
     #content { margin-left: 80px; width: calc(100% - 80px); }
     .nav-link { justify-content: center; }
 }
+
+/* --- Sidebar Enhancements --- */
+#sidebar {
+    background: #001a3d;
+    padding: 20px 15px;
+}
+
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px;
+    margin-bottom: 20px;
+    border: none;
+}
+
+.logo-circle {
+    background: var(--gold);
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.logo-icon { color: var(--navy); width: 24px; }
+
+.header-text h3 { font-size: 1.2rem; letter-spacing: 1px; }
+.header-text span { font-size: 0.6rem; opacity: 0.7; display: block; }
+
+/* User Profile Card */
+.user-profile-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 30px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.user-avatar {
+    width: 38px;
+    height: 38px;
+    background: var(--gold);
+    color: var(--navy);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+}
+
+.user-info .user-name { font-size: 0.85rem; display: block; font-weight: 600; }
+.user-info .user-status { font-size: 0.7rem; color: var(--gold); font-weight: 700; }
+
+/* Icon Sizing */
+[data-lucide] {
+    width: 20px;
+    height: 20px;
+    stroke-width: 2px;
+}
+
+/* Sidebar Nav */
+.nav-link {
+    border-radius: 10px;
+    margin-bottom: 5px;
+    color: #aeb9cc;
+}
+
+.nav-link.active {
+    background: var(--gold) !important;
+    color: var(--navy) !important;
+}
+
+.nav-link.active i {
+    color: var(--navy);
+}
+
+/* Modern Card Styling for Modules */
+.dashboard-card {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.03);
+    border: 1px solid #f0f0f0;
+}
+
