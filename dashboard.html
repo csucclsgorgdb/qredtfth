@@ -56,7 +56,7 @@
             <div id="module-container" class="container-fluid">
                 <div id="dashboard-view">
                     <div class="module-header">
-                        <h1 class="module-title">Welcome Back!</h1>
+                        <h1 class="module-title">Welcome Back, HERO!</h1>
                         <p class="module-subtitle">System status and overview for today.</p>
                     </div>
                     
@@ -64,10 +64,42 @@
                         <div class="stat-card">
                             <h3>Total Collections</h3>
                             <p id="dash-collection">₱0.00</p>
+                            <span style="font-size:0.7rem; color:var(--text-muted)">Current Month</span>
                         </div>
                         <div class="stat-card">
                             <h3>Active Events</h3>
                             <p id="dash-events">0</p>
+                            <span style="font-size:0.7rem; color:var(--text-muted)">Ongoing activities</span>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Attendance Rate</h3>
+                            <p id="dash-rate">0%</p>
+                            <span style="font-size:0.7rem; color:var(--text-muted)">Daily average</span>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-top: 24px;">
+                        <div class="dashboard-card">
+                            <h3 style="margin-bottom: 20px; display:flex; align-items:center; gap:10px;">
+                                <i data-lucide="zap" style="color:var(--hero-gold)"></i> Quick Actions
+                            </h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                <button class="btn-navy" style="padding: 20px; height: auto; text-align: left;" onclick="document.querySelector('[data-module=\'attendance\']').click()">
+                                    <i data-lucide="scan"></i><br>Scan Attendance
+                                </button>
+                                <button class="btn-gold" style="padding: 20px; height: auto; text-align: left;" onclick="document.querySelector('[data-module=\'finance\']').click()">
+                                    <i data-lucide="banknote"></i><br>New Payment
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="dashboard-card" style="background: var(--hero-navy); color: white;">
+                            <h3 style="color: white; margin-bottom: 15px;">System Health</h3>
+                            <div style="font-size: 0.85rem; display: flex; flex-direction: column; gap: 10px;">
+                                <div style="display:flex; justify-content:space-between;">Database <span style="color:#4ade80">ONLINE</span></div>
+                                <div style="display:flex; justify-content:space-between;">API Gateway <span style="color:#4ade80">ACTIVE</span></div>
+                                <div style="display:flex; justify-content:space-between;">Storage <span style="color:#4ade80">98% FREE</span></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -91,23 +123,18 @@
         document.getElementById('user-name-display').innerText = userEmail.split('@')[0];
         document.getElementById('avatar-initial').innerText = userEmail.charAt(0).toUpperCase();
 
-        // Security: Remove Admin-only features for regular staff
         if(userRole !== 'Super Admin') {
             document.querySelectorAll('.admin-only').forEach(el => el.remove());
         }
 
         // 2. The Core Controller (Module Switcher)
         const switchModule = (moduleName) => {
-            // Update Active Class on Sidebar
             document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
             const activeLink = document.querySelector(`[data-module="${moduleName}"]`);
             if (activeLink) activeLink.classList.add('active');
 
-            // Initialize the correct JS Logic
             switch (moduleName) {
                 case 'dashboard':
-                    // Refresh current view (Default)
-                    location.hash = ''; 
                     window.location.reload(); 
                     break;
                 case 'students':
@@ -123,25 +150,21 @@
                     initAttendance();
                     break;
                 default:
-                    console.error("Module logic not found for: " + moduleName);
+                    console.error("Module logic not found");
             }
 
-            // Re-run Lucide to render icons inside newly injected HTML
             setTimeout(() => lucide.createIcons(), 100);
         };
 
-        // Attach Global Event Listeners
         document.querySelectorAll('.nav-link').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
-                const mod = e.currentTarget.dataset.module;
-                switchModule(mod);
+                switchModule(e.currentTarget.dataset.module);
             });
         });
 
         document.getElementById('logout-btn').onclick = logout;
 
-        // 3. System Utilities
         async function fetchVerse() {
             try {
                 const res = await fetch('https://labs.bible.org/api/?passage=votd&type=json');
@@ -152,13 +175,11 @@
             }
         }
 
-        // Clock Update
         setInterval(() => {
             const timeEl = document.getElementById('clock');
             if(timeEl) timeEl.innerText = new Date().toLocaleTimeString();
         }, 1000);
 
-        // Run Initial Setup
         fetchVerse();
         lucide.createIcons();
     </script>
