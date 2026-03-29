@@ -1,12 +1,16 @@
 import { db } from './firebase-config.js';
 import { 
-    collection, query, orderBy, limit, startAfter, getDocs, doc, writeBatch, where, deleteDoc 
+    collection, query, orderBy, limit, startAfter, getDocs, doc, writeBatch, where, deleteDoc, getDoc, updateDoc 
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 let lastVisible = null; 
 const PAGE_SIZE = 25;
 let currentSearch = "";
 
+/**
+ * MODULE INITIALIZATION
+ * Sets up the UI and initial data fetch.
+ */
 export async function initStudents() {
     const container = document.getElementById('module-container');
     
@@ -14,12 +18,12 @@ export async function initStudents() {
         <div class="module-header" style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:30px;">
             <div>
                 <h1 class="module-title" style="font-weight:800; color:var(--hero-navy);">Student Management</h1>
-                <p class="module-subtitle">Direct Database Access • No Format Restrictions</p>
+                <p class="module-subtitle">ID • Name • College • Course/Program • Year</p>
             </div>
             <div style="display:flex; gap:12px;">
                 <div class="search-box" style="position:relative;">
                     <i data-lucide="search" style="position:absolute; left:12px; top:10px; width:16px; color:var(--text-muted);"></i>
-                    <input type="text" id="student-search" placeholder="Search name..." style="padding-left:40px; width:250px; border-radius:10px; border:1px solid #e2e8f0; height:40px;">
+                    <input type="text" id="student-search" placeholder="Search full name..." style="padding-left:40px; width:250px; border-radius:10px; border:1px solid #e2e8f0; height:40px;">
                 </div>
                 
                 <input type="file" id="file-import" accept=".csv, .xlsx, .xls" style="display:none">
@@ -29,10 +33,10 @@ export async function initStudents() {
             </div>
         </div>
 
-        <div id="import-status-area" style="display:none;" class="dashboard-card">
+        <div id="import-status-area" style="display:none; margin-bottom:20px;" class="dashboard-card">
             <div style="display:flex; align-items:center; gap:15px;">
                 <div class="logo-circle" style="background:var(--hero-gold);"><i data-lucide="loader-2" class="spin"></i></div>
-                <b id="import-msg">Processing...</b>
+                <b id="import-msg">Syncing records...</b>
             </div>
         </div>
 
@@ -40,10 +44,10 @@ export async function initStudents() {
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>ID</th>
+                        <th>ID Number</th>
                         <th>Student Name</th>
                         <th>College</th>
-                        <th>Course/Program</th>
+                        <th>Course / Program</th>
                         <th>Year</th>
                         <th style="text-align:right">Actions</th>
                     </tr>
@@ -53,35 +57,81 @@ export async function initStudents() {
         </div>
 
         <div style="text-align:center; margin-top:30px; margin-bottom:50px;">
-            <button id="load-more-btn" class="btn-navy" style="background:transparent; border:1px solid var(--hero-navy); color:var(--hero-navy); padding:10px 40px; border-radius:30px; cursor:pointer;">
-                Load More
+            <button id="load-more-btn" class="btn-navy" style="background:transparent; border:1px solid var(--hero-navy); color:var(--hero-navy); padding:10px 40px; border-radius:30px; cursor:pointer; font-weight:600;">
+                Load More Records
             </button>
         </div>
     `;
 
-    // --- RE-BINDING ALL LISTENERS ---
+    // Event Bindings
     document.getElementById('btn-import-trigger').onclick = () => document.getElementById('file-import').click();
     document.getElementById('file-import').onchange = handleFileUpload;
-    document.getElementById('btn-add-manual').onclick = () => showAddModal();
+    document.getElementById('btn-add-manual').onclick = () => showStudentModal(); 
     document.getElementById('load-more-btn').onclick = () => loadStudents(true);
     
-    // Fixed Search Logic
     const searchInput = document.getElementById('student-search');
-    searchInput.addEventListener('input', (e) => {
+    searchInput.oninput = (e) => {
         currentSearch = e.target.value.trim().toUpperCase();
         lastVisible = null;
         loadStudents();
-    });
+    };
 
     loadStudents();
     lucide.createIcons();
 }
 
+/**
+ * DATA FETCHING & RENDERING
+ */
+async function loadStudents(isAppend = false) {
+    const tbody = document.getElementById('student-list-body');
+    const loadMoreBtn = document.getElementById('load-more-btn');
+    if(!isAppend) tbody.innerHTML = "";
+
+    try {
+        const constraints = [orderBy("fullName"), limit(PAGE_SIZE)];
+        if (currentSearch) {
+            constraints.unshift(where("fullName", ">=", currentSearch), where("fullName", "<=", currentSearch + "\uf8ff"));
+        }
+        if (lastVisible && isAppend) constraints.push(startAfter(lastVisible));
+
+        const q = query(collection(db, "students"), ...constraints);
+        const snapshot = await getDocs(q);
+        
+        lastVisible = snapshot.docs[snapshot.docs.length - 1];
+        
+        // Toggle "Load More" button visibility
+        loadMoreBtn.style.display = snapshot.docs.length < PAGE_SIZE ? "none" : "inline-block";
+
+        snapshot.forEach(docSnap => {
+            const s = docSnap.data();
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><b>${s.studentId}</b></td>
+                <td style="text-transform: uppercase;">${s.fullName}</td>
+                <td>${s.college || '---'}</td>
+                <td><span class="badge" style="background:#f1f5f9; color:var(--hero-navy); border:1px solid #e2e8f0;">${s.program || '---'}</span></td>
+                <td>${s.yearLevel || '---'}</td>
+                <td style="text-align:right">
+                    <button class="btn-edit-trigger" data-id="${docSnap.id}" style="border:none; background:none; color:var(--hero-navy); cursor:pointer;"><i data-lucide="edit-3" style="width:16px"></i></button>
+                    <button class="btn-delete-trigger" data-id="${docSnap.id}" style="border:none; background:none; color:#ef4444; cursor:pointer; margin-left:12px;"><i data-lucide="trash-2" style="width:16px"></i></button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+
+        attachActionListeners();
+        lucide.createIcons();
+    } catch (e) { console.error("Error loading students:", e); }
+}
+
+/**
+ * EXCEL BULK IMPORT
+ */
 async function handleFileUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
 
-    const msg = document.getElementById('import-msg');
     document.getElementById('import-status-area').style.display = "block";
 
     const reader = new FileReader();
@@ -96,16 +146,14 @@ async function handleFileUpload(event) {
             let count = 0;
 
             for (let row of jsonData) {
-                // FLEXIBLE MAPPING: Takes whatever value is in the cell (BTLED, BTVTEd, etc.)
                 const id = (row.Id || row['Student ID'] || row.ID || "").toString().trim();
                 const name = (row['Student Name'] || row.Name || row['Full Name'] || "").toString().trim();
 
                 if (id && name) {
-                    const studentRef = doc(db, "students", id);
-                    batch.set(studentRef, {
+                    batch.set(doc(db, "students", id), {
                         studentId: id,
                         fullName: name.toUpperCase(),
-                        college: (row.College || "N/A").toString().trim(),
+                        college: (row.College || "").toString().trim(),
                         program: (row['Course/Program'] || row.Course || row.Program || "").toString().trim(),
                         yearLevel: (row['Year Level'] || row.Year || "").toString().trim(),
                         balance: 0,
@@ -114,113 +162,99 @@ async function handleFileUpload(event) {
                     count++;
                 }
             }
-
             await batch.commit();
             alert(`Successfully imported ${count} students!`);
-            location.reload(); 
-        } catch (err) {
-            alert("Import Error: " + err.message);
-        }
+            initStudents(); // Full refresh
+        } catch (err) { alert("Import Error: " + err.message); }
     };
     reader.readAsArrayBuffer(file);
 }
 
-async function loadStudents(isAppend = false) {
-    const tbody = document.getElementById('student-list-body');
-    if(!isAppend) tbody.innerHTML = "";
+/**
+ * MODAL: ADD & EDIT STUDENT
+ */
+async function showStudentModal(studentId = null) {
+    let s = { studentId: '', fullName: '', college: '', program: '', yearLevel: '' };
+    
+    // Fetch data if editing
+    if (studentId) {
+        const docRef = await getDoc(doc(db, "students", studentId));
+        if (docRef.exists()) s = docRef.data();
+    }
 
-    try {
-        const constraints = [orderBy("fullName"), limit(PAGE_SIZE)];
-        if (currentSearch) {
-            constraints.unshift(where("fullName", ">=", currentSearch), where("fullName", "<=", currentSearch + "\uf8ff"));
-        }
-        if (lastVisible && isAppend) constraints.push(startAfter(lastVisible));
-
-        const q = query(collection(db, "students"), ...constraints);
-        const snapshot = await getDocs(q);
-        
-        lastVisible = snapshot.docs[snapshot.docs.length - 1];
-
-        snapshot.forEach(docSnap => {
-            const s = docSnap.data();
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td><b>${s.studentId}</b></td>
-                <td>${s.fullName}</td>
-                <td>${s.college}</td>
-                <td><span class="badge" style="background:#e2e8f0; color:#1e293b">${s.program}</span></td>
-                <td>${s.yearLevel}</td>
-                <td style="text-align:right">
-                    <button class="btn-edit" data-id="${docSnap.id}" style="border:none; background:none; color:var(--hero-navy); cursor:pointer; padding:5px;"><i data-lucide="edit-3"></i></button>
-                    <button class="btn-delete" data-id="${docSnap.id}" style="border:none; background:none; color:#ef4444; cursor:pointer; padding:5px; margin-left:10px;"><i data-lucide="trash-2"></i></button>
-                </td>
-            `;
-            tbody.appendChild(row);
-        });
-
-        // RE-ATTACH EDIT/DELETE LISTENERS AFTER TABLE RENDERS
-        attachActionListeners();
-        lucide.createIcons();
-    } catch (e) { console.error(e); }
-}
-
-function attachActionListeners() {
-    document.querySelectorAll('.btn-delete').forEach(btn => {
-        btn.onclick = async (e) => {
-            const id = e.currentTarget.dataset.id;
-            if(confirm(`Delete student ${id}?`)) {
-                await deleteDoc(doc(db, "students", id));
-                loadStudents(); // Refresh
-            }
-        };
-    });
-
-    document.querySelectorAll('.btn-edit').forEach(btn => {
-        btn.onclick = (e) => {
-            const id = e.currentTarget.dataset.id;
-            alert("Edit feature for " + id + " is loading...");
-            // You can call showEditModal(id) here
-        };
-    });
-}
-
-// Manual Add Modal (Simplified)
-export function showAddModal() {
     const modalHtml = `
-        <div class="modal-overlay" id="modal-container">
-            <div class="modal-content" style="padding:30px;">
-                <h3>Add New Student</h3><br>
-                <form id="manual-add-form">
-                    <input type="text" name="id" placeholder="ID Number" required style="width:100%; margin-bottom:10px; padding:10px;">
-                    <input type="text" name="name" placeholder="Full Name" required style="width:100%; margin-bottom:10px; padding:10px;">
-                    <input type="text" name="college" placeholder="College" style="width:100%; margin-bottom:10px; padding:10px;">
-                    <input type="text" name="program" placeholder="Course/Program" style="width:100%; margin-bottom:10px; padding:10px;">
-                    <input type="text" name="year" placeholder="Year Level" style="width:100%; margin-bottom:20px; padding:10px;">
+        <div class="modal-overlay" id="student-modal-container">
+            <div class="modal-content" style="max-width:450px; padding:30px;">
+                <h3 style="margin-bottom:20px; color:var(--hero-navy)">${studentId ? 'Update' : 'Add New'} Student</h3>
+                <form id="student-form-submit">
+                    <label style="font-size:0.8rem; font-weight:600;">ID NUMBER</label>
+                    <input type="text" name="id" value="${s.studentId}" ${studentId ? 'readonly' : 'required'} style="width:100%; margin-bottom:12px; padding:10px; border-radius:8px; border:1px solid #ddd;">
+                    
+                    <label style="font-size:0.8rem; font-weight:600;">FULL NAME</label>
+                    <input type="text" name="name" value="${s.fullName}" required style="width:100%; margin-bottom:12px; padding:10px; border-radius:8px; border:1px solid #ddd;">
+                    
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                        <div>
+                            <label style="font-size:0.8rem; font-weight:600;">COLLEGE</label>
+                            <input type="text" name="college" value="${s.college}" style="width:100%; margin-bottom:12px; padding:10px; border-radius:8px; border:1px solid #ddd;">
+                        </div>
+                        <div>
+                            <label style="font-size:0.8rem; font-weight:600;">YEAR LEVEL</label>
+                            <input type="text" name="year" value="${s.yearLevel}" style="width:100%; margin-bottom:12px; padding:10px; border-radius:8px; border:1px solid #ddd;">
+                        </div>
+                    </div>
+                    
+                    <label style="font-size:0.8rem; font-weight:600;">COURSE/PROGRAM</label>
+                    <input type="text" name="program" value="${s.program}" style="width:100%; margin-bottom:25px; padding:10px; border-radius:8px; border:1px solid #ddd;">
+                    
                     <div style="text-align:right">
-                        <button type="button" onclick="document.getElementById('modal-container').remove()" class="btn-outline">Cancel</button>
-                        <button type="submit" class="btn-gold">Save Student</button>
+                        <button type="button" onclick="document.getElementById('student-modal-container').remove()" class="btn-outline" style="border:none; background:#f1f5f9; padding:10px 20px; border-radius:8px; cursor:pointer;">Cancel</button>
+                        <button type="submit" class="btn-gold" style="padding:10px 20px;">Save Record</button>
                     </div>
                 </form>
             </div>
         </div>
     `;
+    
     document.getElementById('modal-root').innerHTML = modalHtml;
 
-    document.getElementById('manual-add-form').onsubmit = async (e) => {
+    document.getElementById('student-form-submit').onsubmit = async (e) => {
         e.preventDefault();
-        const f = new FormData(e.target);
-        const data = Object.fromEntries(f.entries());
-        
-        await writeBatch(db).set(doc(db, "students", data.id), {
-            studentId: data.id,
-            fullName: data.name.toUpperCase(),
-            college: data.college,
-            program: data.program,
-            yearLevel: data.year,
-            balance: 0
-        }).commit();
+        const fd = new FormData(e.target);
+        const newData = {
+            studentId: fd.get('id'),
+            fullName: fd.get('name').toUpperCase(),
+            college: fd.get('college'),
+            program: fd.get('program'),
+            yearLevel: fd.get('year')
+        };
 
-        document.getElementById('modal-container').remove();
-        loadStudents();
+        if (studentId) {
+            await updateDoc(doc(db, "students", studentId), newData);
+        } else {
+            await writeBatch(db).set(doc(db, "students", newData.studentId), { ...newData, balance: 0 }).commit();
+        }
+
+        document.getElementById('student-modal-container').remove();
+        loadStudents(); // Refresh current view
     };
+}
+
+/**
+ * ROW ACTIONS
+ */
+function attachActionListeners() {
+    document.querySelectorAll('.btn-delete-trigger').forEach(btn => {
+        btn.onclick = async (e) => {
+            const id = e.currentTarget.dataset.id;
+            if(confirm(`Are you sure you want to delete student record ${id}?`)) {
+                await deleteDoc(doc(db, "students", id));
+                loadStudents();
+            }
+        };
+    });
+
+    document.querySelectorAll('.btn-edit-trigger').forEach(btn => {
+        btn.onclick = (e) => showStudentModal(e.currentTarget.dataset.id);
+    });
 }
