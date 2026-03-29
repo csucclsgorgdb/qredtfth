@@ -1,118 +1,167 @@
 import { db } from './firebase-config.js';
 import { 
-    collection, query, orderBy, limit, startAfter, getDocs, doc, setDoc 
+    collection, query, orderBy, limit, startAfter, getDocs, doc, writeBatch, where 
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-let lastVisible = null; // Pagination cursor
-const PAGE_SIZE = 20;
+let lastVisible = null; 
+const PAGE_SIZE = 25;
+let currentSearch = "";
 
 export async function initStudents() {
     const container = document.getElementById('module-container');
+    
     container.innerHTML = `
-        <div class="module-header">
-            <h2>Student Management</h2>
-            <div class="actions">
+        <div class="module-header" style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:30px;">
+            <div>
+                <h1 class="module-title">Student Directory</h1>
+                <p class="module-subtitle">Manage institutional records and academic profiles</p>
+            </div>
+            <div style="display:flex; gap:12px;">
+                <div class="search-box" style="position:relative;">
+                    <i data-lucide="search" style="position:absolute; left:12px; top:10px; width:16px; color:var(--text-muted);"></i>
+                    <input type="text" id="student-search" placeholder="Search Last Name..." style="padding-left:40px; width:250px;">
+                </div>
                 <input type="file" id="csv-import" accept=".csv" style="display:none">
-                <button class="btn-gold" onclick="document.getElementById('csv-import').click()">Import CSV</button>
-                <button class="btn-navy" id="add-student-btn">Add New Student</button>
+                <button class="btn-navy" onclick="document.getElementById('csv-import').click()">
+                    <i data-lucide="file-up"></i> Import CSV
+                </button>
+                <button class="btn-gold" id="add-student-btn">
+                    <i data-lucide="user-plus"></i> Add New
+                </button>
             </div>
         </div>
-        <div class="table-responsive">
+
+        <div class="dashboard-card table-responsive" style="padding:0; overflow:hidden;">
             <table class="data-table">
                 <thead>
                     <tr>
                         <th>Student ID</th>
                         <th>Name</th>
-                        <th>Course/Year</th>
+                        <th>Course & Year</th>
                         <th>Balance</th>
-                        <th>Actions</th>
+                        <th style="text-align:right">Actions</th>
                     </tr>
                 </thead>
-                <tbody id="student-list-body"></tbody>
+                <tbody id="student-list-body">
+                    <tr><td colspan="5" style="text-align:center; padding:50px; color:var(--text-muted)">Initialising Database...</td></tr>
+                </tbody>
             </table>
         </div>
-        <div class="pagination-footer">
-            <button id="load-more-btn" class="btn-outline">Load More Students...</button>
+
+        <div style="text-align:center; margin-top:30px;">
+            <button id="load-more-btn" class="btn-navy" style="background:transparent; border:1px solid var(--hero-navy); color:var(--hero-navy); padding:10px 40px;">
+                Load More Records
+            </button>
         </div>
     `;
 
-    lastVisible = null; // Reset pagination
-    loadStudents();
-
-    document.getElementById('load-more-btn').addEventListener('click', loadStudents);
+    // Reset State
+    lastVisible = null;
+    currentSearch = "";
+    
+    // Listeners
+    document.getElementById('load-more-btn').addEventListener('click', () => loadStudents(true));
     document.getElementById('csv-import').addEventListener('change', handleCSV);
+    document.getElementById('student-search').addEventListener('input', (e) => {
+        currentSearch = e.target.value.trim();
+        lastVisible = null; // Reset pagination for search
+        document.getElementById('student-list-body').innerHTML = ""; 
+        loadStudents();
+    });
+
+    loadStudents();
+    lucide.createIcons();
 }
 
-async function loadStudents() {
-    const loader = document.getElementById('load-more-btn');
-    loader.innerText = "Loading...";
+async function loadStudents(isAppend = false) {
+    const tbody = document.getElementById('student-list-body');
+    const loadBtn = document.getElementById('load-more-btn');
+    
+    if(!isAppend) tbody.innerHTML = "";
+    loadBtn.innerText = "Processing...";
 
     try {
-        let q = query(
-            collection(db, "students"), 
-            orderBy("lastName"), 
-            limit(PAGE_SIZE)
-        );
-
-        if (lastVisible) {
-            q = query(collection(db, "students"), orderBy("lastName"), startAfter(lastVisible), limit(PAGE_SIZE));
+        let q;
+        const constraints = [orderBy("lastName"), limit(PAGE_SIZE)];
+        
+        // Add Search Filter if applicable
+        if (currentSearch) {
+            constraints.unshift(where("lastName", ">=", currentSearch), where("lastName", "<=", currentSearch + "\uf8ff"));
         }
 
-        const documentSnapshots = await getDocs(q);
-        
-        // Save the last visible document for next page
-        lastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1];
+        if (lastVisible && isAppend) {
+            constraints.push(startAfter(lastVisible));
+        }
 
-        const tbody = document.getElementById('student-list-body');
+        q = query(collection(db, "students"), ...constraints);
+        const snapshot = await getDocs(q);
         
-        documentSnapshots.forEach((doc) => {
-            const data = doc.data();
-            const row = `
-                <tr>
-                    <td>${data.studentId}</td>
-                    <td>${data.lastName}, ${data.firstName}</td>
-                    <td>${data.course} - ${data.year}</td>
-                    <td>₱${data.balance || '0.00'}</td>
-                    <td><button class="btn-sm"><i class="fas fa-edit"></i></button></td>
-                </tr>
+        if (snapshot.empty && !isAppend) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:50px;">No students found matching your criteria.</td></tr>`;
+            loadBtn.style.display = "none";
+            return;
+        }
+
+        lastVisible = snapshot.docs[snapshot.docs.length - 1];
+
+        snapshot.forEach((doc) => {
+            const s = doc.data();
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><span style="font-weight:700; color:var(--hero-navy)">${s.studentId}</span></td>
+                <td>${s.lastName}, ${s.firstName}</td>
+                <td><span class="badge" style="background:#e2e8f0; color:var(--hero-navy);">${s.course}</span> ${s.year}</td>
+                <td>₱${parseFloat(s.balance || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                <td style="text-align:right">
+                    <button class="btn-action" style="background:none; border:none; cursor:pointer; color:var(--hero-navy)"><i data-lucide="edit-3" style="width:18px"></i></button>
+                    <button class="btn-action" style="background:none; border:none; cursor:pointer; color:#ef4444; margin-left:10px"><i data-lucide="trash-2" style="width:18px"></i></button>
+                </td>
             `;
-            tbody.innerHTML += row;
+            tbody.appendChild(row);
         });
 
-        loader.innerText = lastVisible ? "Load More" : "End of Records";
-        if (!lastVisible) loader.disabled = true;
+        loadBtn.innerText = lastVisible ? "Load More Records" : "End of Database";
+        loadBtn.disabled = !lastVisible;
+        lucide.createIcons();
 
     } catch (error) {
-        console.error("Error loading students:", error);
+        console.error("Fetch Error:", error);
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red">Error accessing database. Check console.</td></tr>`;
     }
 }
 
-// Logic for CSV Bulk Import
 async function handleCSV(event) {
     const file = event.target.files[0];
+    if (!file) return;
+
     const reader = new FileReader();
-    
     reader.onload = async (e) => {
-        const text = e.target.result;
-        const rows = text.split('\n').slice(1); // Skip header
-        
+        const rows = e.target.result.split('\n').slice(1);
+        const batch = writeBatch(db); 
+        let count = 0;
+
+        document.getElementById('student-list-body').innerHTML = `<tr><td colspan="5" style="text-align:center; padding:50px;">Importing ${rows.length} records... Please wait.</td></tr>`;
+
         for (let row of rows) {
             const [id, first, last, course, year] = row.split(',');
-            if (id) {
-                // Use setDoc so we can specify the Document ID as the Student ID
-                await setDoc(doc(db, "students", id.trim()), {
+            if (id && id.trim()) {
+                const studentRef = doc(db, "students", id.trim());
+                batch.set(studentRef, {
                     studentId: id.trim(),
                     firstName: first.trim(),
                     lastName: last.trim(),
                     course: course.trim(),
                     year: year.trim(),
                     balance: 0,
-                    orgId: localStorage.getItem('orgId')
+                    orgId: localStorage.getItem('orgId') || "HERO_DEFAULT"
                 });
+                count++;
             }
         }
-        alert("Import Complete!");
-        initStudents(); // Refresh list
+
+        await batch.commit();
+        alert(`Success: ${count} students imported.`);
+        initStudents();
     };
     reader.readAsText(file);
 }
