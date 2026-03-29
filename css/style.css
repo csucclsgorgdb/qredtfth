@@ -1,180 +1,240 @@
-/* 1. Global Variables & Reset */
+/* --- 1. THEME VARIABLES --- */
 :root {
-    --navy: #002147;
-    --gold: #FFD700;
-    --dark-gold: #c5a000;
-    --white: #FFFFFF;
-    --bg-light: #f4f7f6;
-    --sidebar-width: 260px;
+    --navy: #001a3d;          /* Deep Hero Navy */
+    --navy-light: #002b66;    /* Lighter Navy for cards/hovers */
+    --gold: #ffcc00;          /* Vibrant Hero Yellow */
+    --gold-hover: #e6b800;
+    --white: #ffffff;
+    --bg-body: #f0f2f5;       /* Light grey background */
+    --text-main: #1a1a1a;
+    --text-muted: #64748b;
+    --sidebar-width: 280px;
+    --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    --border-radius: 12px;
 }
 
+/* --- 2. GLOBAL RESET --- */
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    font-family: 'Inter', 'Segoe UI', sans-serif;
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
 }
 
 body {
-    background-color: var(--bg-light);
+    background-color: var(--bg-body);
+    color: var(--text-main);
+    display: flex;
     min-height: 100vh;
+    overflow-x: hidden;
 }
 
-/* 2. Login Page (Standalone Layout) */
-.login-page {
-    height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: linear-gradient(135deg, var(--navy) 0%, #003366 100%);
-}
-
-.login-card {
-    background: var(--white);
-    padding: 40px;
-    border-radius: 12px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-    width: 90%;
-    max-width: 400px;
-    text-align: center;
-}
-
-/* 3. Dashboard Wrapper Layout (Flexbox) */
-.wrapper {
-    display: flex;
-    width: 100%;
-    align-items: stretch;
-}
-
-/* Sidebar Styling */
+/* --- 3. SIDEBAR (STAYS LEFT) --- */
 #sidebar {
     width: var(--sidebar-width);
-    min-width: var(--sidebar-width);
     background: var(--navy);
     color: var(--white);
-    min-height: 100vh;
+    height: 100vh;
     position: fixed;
-    transition: all 0.3s;
+    left: 0;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
     z-index: 1000;
 }
 
 .sidebar-header {
-    padding: 20px;
     text-align: center;
-    background: rgba(0,0,0,0.1);
+    padding-bottom: 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.nav-logo { width: 60px; margin-bottom: 10px; }
+.nav-logo {
+    width: 50px;
+    margin-bottom: 10px;
+}
 
-#sidebar ul.components {
-    padding: 20px 0;
+.components {
     list-style: none;
+    margin-top: 30px;
+    flex-grow: 1;
 }
 
-#sidebar ul li a {
-    padding: 15px 25px;
-    display: block;
-    color: var(--white);
+.components li {
+    margin-bottom: 8px;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    color: #cbd5e1;
     text-decoration: none;
-    font-size: 1.1em;
-    transition: 0.3s;
+    border-radius: var(--border-radius);
+    transition: all 0.3s ease;
+    font-weight: 500;
 }
 
-#sidebar ul li a:hover, #sidebar ul li a.active {
+.nav-link i {
+    width: 20px;
+    font-size: 1.1rem;
+}
+
+.nav-link:hover, .nav-link.active {
     background: var(--gold);
     color: var(--navy);
-    font-weight: bold;
 }
 
 .logout-btn {
-    width: 80%;
-    margin: 20px 10%;
-    padding: 10px;
-    background: transparent;
-    border: 1px solid var(--gold);
-    color: var(--gold);
+    margin-top: auto;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #ef4444; /* Soft Red */
+    padding: 12px;
+    border-radius: 8px;
     cursor: pointer;
-    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: 0.3s;
 }
 
-/* 4. Main Content Area */
+.logout-btn:hover {
+    background: #ef4444;
+    color: white;
+}
+
+/* --- 4. MAIN CONTENT AREA --- */
 #content {
-    width: 100%;
+    margin-left: var(--sidebar-width);
+    width: calc(100% - var(--sidebar-width));
     padding: 30px;
-    margin-left: var(--sidebar-width); /* Pushes content past the fixed sidebar */
-    min-height: 100vh;
 }
 
 .top-nav {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: white;
-    padding: 15px 25px;
-    border-radius: 8px;
-    margin-bottom: 25px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    background: var(--white);
+    padding: 16px 24px;
+    border-radius: var(--border-radius);
+    margin-bottom: 24px;
+    box-shadow: var(--card-shadow);
 }
 
-/* 5. Components & Tables */
+.verse-text {
+    font-style: italic;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    max-width: 60%;
+}
+
+.badge {
+    background: var(--navy);
+    color: var(--gold);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+/* --- 5. MODULE DASHBOARD CARDS --- */
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.stat-card {
+    background: var(--white);
+    padding: 24px;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+    border-bottom: 4px solid var(--gold);
+}
+
+.stat-card h3 {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+}
+
+.stat-card p {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--navy);
+}
+
+/* --- 6. DATA TABLES (STUDENTS/FINANCE) --- */
+.table-responsive {
+    background: var(--white);
+    padding: 20px;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+    margin-top: 20px;
+}
+
 .data-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 20px;
-    background: white;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
 }
 
 .data-table th {
-    background: var(--navy);
-    color: var(--gold);
-    padding: 15px;
     text-align: left;
+    padding: 16px;
+    background: #f8fafc;
+    color: var(--text-muted);
+    font-weight: 600;
+    border-bottom: 2px solid #e2e8f0;
 }
 
 .data-table td {
-    padding: 12px 15px;
-    border-bottom: 1px solid #eee;
+    padding: 16px;
+    border-bottom: 1px solid #f1f5f9;
 }
 
-/* 6. Buttons & Interactive Elements */
-.btn-gold { background: var(--gold); color: var(--navy); border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-.btn-navy { background: var(--navy); color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
-input { padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+/* --- 7. BUTTONS --- */
+.btn-gold {
+    background: var(--gold);
+    color: var(--navy);
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.2s;
+}
 
-/* 7. Modules (Events, Attendance, Scan) */
-.event-card {
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-    border-left: 5px solid var(--gold);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    margin-bottom: 20px;
+.btn-gold:hover { background: var(--gold-hover); }
+
+/* --- 8. SCANNER BOX (ATTENDANCE) --- */
+#reader {
+    border: none !important;
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    box-shadow: var(--card-shadow);
 }
 
 .scan-feedback {
     margin-top: 20px;
-    padding: 20px;
+    padding: 15px;
     border-radius: 8px;
     text-align: center;
-    font-weight: bold;
 }
 
-.scan-feedback.success { background: #d4edda; color: #155724; border: 2px solid #c3e6cb; }
-.scan-feedback.info { background: #d1ecf1; color: #0c5460; border: 2px solid #bee5eb; }
+.success { background: #dcfce7; color: #166534; }
+.info { background: #e0f2fe; color: #075985; }
 
-#reader {
-    border: 4px solid var(--navy) !important;
-    border-radius: 15px;
-    overflow: hidden;
-    margin: 20px auto;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-    #sidebar { margin-left: -260px; }
-    #content { margin-left: 0; }
-    .wrapper.active #sidebar { margin-left: 0; }
+/* --- 9. RESPONSIVE --- */
+@media (max-width: 1024px) {
+    #sidebar { width: 80px; padding: 15px; }
+    #sidebar h3, .nav-link span, .sidebar-header h3 { display: none; }
+    #content { margin-left: 80px; width: calc(100% - 80px); }
+    .nav-link { justify-content: center; }
 }
