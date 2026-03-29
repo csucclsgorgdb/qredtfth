@@ -3,11 +3,18 @@ import {
     collection, query, orderBy, limit, startAfter, getDocs, doc, writeBatch, where 
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// Load SheetJS Dynamically for Excel (.xlsx) support
+// 1. GLOBAL LOAD GUARD FOR EXCEL
+let isExcelLibReady = false;
 if (!window.XLSX) {
     const script = document.createElement('script');
     script.src = "https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js";
+    script.onload = () => { 
+        isExcelLibReady = true; 
+        console.log("HERO System: Excel Library Loaded."); 
+    };
     document.head.appendChild(script);
+} else {
+    isExcelLibReady = true;
 }
 
 let lastVisible = null; 
@@ -28,9 +35,10 @@ export async function initStudents() {
                     <i data-lucide="search" style="position:absolute; left:12px; top:10px; width:16px; color:var(--text-muted);"></i>
                     <input type="text" id="student-search" placeholder="Search Last Name..." style="padding-left:40px; width:250px; border-radius:10px; border:1px solid #e2e8f0; height:40px;">
                 </div>
+                
                 <input type="file" id="file-import" accept=".csv, .xlsx, .xls" style="display:none">
                 
-                <button class="btn-navy" onclick="document.getElementById('file-import').click()" style="display:flex; align-items:center; gap:8px;">
+                <button class="btn-navy" id="btn-import-trigger" style="display:flex; align-items:center; gap:8px;">
                     <i data-lucide="file-up"></i> Import Excel/CSV
                 </button>
                 <button class="btn-gold" id="btn-add-manual" style="display:flex; align-items:center; gap:8px;">
@@ -39,7 +47,7 @@ export async function initStudents() {
             </div>
         </div>
 
-        <div id="import-status-area" style="display:none;" class="dashboard-card">
+        <div id="import-status-area" style="display:none; margin-bottom: 20px;" class="dashboard-card">
             <div style="display:flex; align-items:center; gap:15px;">
                 <div class="logo-circle" style="background:var(--hero-gold);"><i data-lucide="loader-2" class="spin"></i></div>
                 <div>
@@ -60,9 +68,7 @@ export async function initStudents() {
                         <th style="text-align:right">Actions</th>
                     </tr>
                 </thead>
-                <tbody id="student-list-body">
-                    <tr><td colspan="5" style="text-align:center; padding:50px; color:var(--text-muted)">Connecting to database...</td></tr>
-                </tbody>
+                <tbody id="student-list-body"></tbody>
             </table>
         </div>
 
@@ -73,15 +79,14 @@ export async function initStudents() {
         </div>
     `;
 
-    // Reset State
-    lastVisible = null;
-    currentSearch = "";
-    
-    // Listeners
-    document.getElementById('load-more-btn').onclick = () => loadStudents(true);
+    // Initialize Listeners
+    document.getElementById('btn-import-trigger').onclick = () => {
+        if(!isExcelLibReady) return alert("System is still initializing Excel components. Please wait a second.");
+        document.getElementById('file-import').click();
+    };
+
     document.getElementById('file-import').onchange = handleFileUpload;
-    document.getElementById('btn-add-manual').onclick = () => alert("Manual Registration Modal coming soon!");
-    
+    document.getElementById('load-more-btn').onclick = () => loadStudents(true);
     document.getElementById('student-search').oninput = (e) => {
         currentSearch = e.target.value.trim();
         lastVisible = null;
@@ -92,23 +97,76 @@ export async function initStudents() {
     lucide.createIcons();
 }
 
+async function handleFileUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const statusArea = document.getElementById('import-status-area');
+    const msg = document.getElementById('import-msg');
+    statusArea.style.display = "block";
+    msg.innerText = "Reading file...";
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            
+            // Convert to JSON
+            const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+            const batch = writeBatch(db); 
+            let count = 0;
+
+            msg.innerText = `Uploading ${jsonData.length} records...`;
+
+            for (let row of jsonData) {
+                // Flexible header detection
+                const id = (row.ID || row['Student ID'] || row.studentId || "").toString().trim();
+                
+                if (id) {
+                    const studentRef = doc(db, "students", id);
+                    batch.set(studentRef, {
+                        studentId: id,
+                        firstName: (row.FirstName || row['First Name'] || row.firstName || "").toString().trim(),
+                        lastName: (row.LastName || row['Last Name'] || row.lastName || "").toString().trim(),
+                        course: (row.Course || "").toString().trim(),
+                        year: (row.Year || row['Year Level'] || "").toString().trim(),
+                        college: (row.College || "").toString().trim(),
+                        balance: 0,
+                        orgId: localStorage.getItem('orgId') || "HERO_001"
+                    });
+                    count++;
+                }
+            }
+
+            await batch.commit();
+            msg.innerHTML = `<span style="color:#166534">Successfully imported ${count} students!</span>`;
+            setTimeout(() => { statusArea.style.display = "none"; }, 3000);
+            initStudents(); // Refresh view
+            
+        } catch (error) {
+            console.error("Import Error:", error);
+            msg.innerHTML = `<span style="color:#ef4444">Import Failed: Check file format.</span>`;
+        }
+    };
+
+    reader.readAsArrayBuffer(file);
+}
+
 async function loadStudents(isAppend = false) {
     const tbody = document.getElementById('student-list-body');
     const loadBtn = document.getElementById('load-more-btn');
     
-    if(!isAppend) tbody.innerHTML = "";
-    loadBtn.innerText = "Syncing...";
+    if(!isAppend) tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:50px; color:var(--text-muted)">Syncing database...</td></tr>`;
+    loadBtn.innerText = "Loading...";
 
     try {
         const constraints = [orderBy("lastName"), limit(PAGE_SIZE)];
-        
         if (currentSearch) {
             constraints.unshift(where("lastName", ">=", currentSearch), where("lastName", "<=", currentSearch + "\uf8ff"));
         }
-
-        if (lastVisible && isAppend) {
-            constraints.push(startAfter(lastVisible));
-        }
+        if (lastVisible && isAppend) constraints.push(startAfter(lastVisible));
 
         const q = query(collection(db, "students"), ...constraints);
         const snapshot = await getDocs(q);
@@ -119,6 +177,7 @@ async function loadStudents(isAppend = false) {
             return;
         }
 
+        if(!isAppend) tbody.innerHTML = ""; // Clear loader if records exist
         lastVisible = snapshot.docs[snapshot.docs.length - 1];
 
         snapshot.forEach((doc) => {
@@ -139,66 +198,10 @@ async function loadStudents(isAppend = false) {
 
         loadBtn.innerText = lastVisible ? "Load More Records" : "End of Records";
         loadBtn.disabled = !lastVisible;
-        loadBtn.style.opacity = lastVisible ? "1" : "0.5";
         lucide.createIcons();
 
     } catch (error) {
         console.error("Fetch Error:", error);
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#ef4444; padding:20px;">Database Error: ${error.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#ef4444; padding:20px;">Database Connection Error.</td></tr>`;
     }
-}
-
-async function handleFileUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const statusArea = document.getElementById('import-status-area');
-    const msg = document.getElementById('import-msg');
-    statusArea.style.display = "block";
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-        try {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            
-            // Convert to JSON (Header mapping handled here)
-            const jsonData = XLSX.utils.sheet_to_json(worksheet);
-            const batch = writeBatch(db); 
-            let count = 0;
-
-            for (let row of jsonData) {
-                // Map headers flexibly: ID/Student ID, FirstName, LastName, Course, Year, College
-                const id = (row.ID || row['Student ID'] || row.studentId || "").toString().trim();
-                
-                if (id) {
-                    const studentRef = doc(db, "students", id);
-                    batch.set(studentRef, {
-                        studentId: id,
-                        firstName: (row.FirstName || row['First Name'] || "").toString().trim(),
-                        lastName: (row.LastName || row['Last Name'] || "").toString().trim(),
-                        course: (row.Course || "").toString().trim(),
-                        year: (row.Year || "").toString().trim(),
-                        college: (row.College || "").toString().trim(),
-                        balance: 0,
-                        orgId: localStorage.getItem('orgId') || "HERO_001"
-                    });
-                    count++;
-                }
-            }
-
-            await batch.commit();
-            msg.innerHTML = `<span style="color:#166534">Successfully imported ${count} students!</span>`;
-            setTimeout(() => { statusArea.style.display = "none"; }, 3000);
-            initStudents();
-        } catch (error) {
-            console.error(error);
-            msg.innerHTML = `<span style="color:#ef4444">Import Failed: ${error.message}</span>`;
-        }
-    };
-
-    // Read as ArrayBuffer to handle both Excel and CSV
-    reader.readAsArrayBuffer(file);
 }
