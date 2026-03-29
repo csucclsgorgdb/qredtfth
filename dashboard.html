@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduFlow | Dashboard</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="wrapper">
+        <nav id="sidebar">
+            <div class="sidebar-header">
+                <img src="assets/logo.png" alt="Logo" class="nav-logo">
+                <h3>EduFlow</h3>
+            </div>
+
+            <ul class="list-unstyled components">
+                <li><a href="#" class="nav-link" data-module="dashboard"><i class="fas fa-home"></i> Dashboard</a></li>
+                <li><a href="#" class="nav-link" data-module="students"><i class="fas fa-user-graduate"></i> Students</a></li>
+                <li><a href="#" class="nav-link" data-module="events"><i class="fas fa-calendar-star"></i> Events</a></li>
+                <li><a href="#" class="nav-link" data-module="finance"><i class="fas fa-wallet"></i> Finance</a></li>
+                <li><a href="#" class="nav-link" data-module="attendance"><i class="fas fa-clipboard-check"></i> Attendance</a></li>
+                <li class="admin-only"><a href="#" class="nav-link" data-module="settings"><i class="fas fa-cog"></i> Settings</a></li>
+            </ul>
+
+            <button id="logout-btn" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+        </nav>
+
+        <div id="content">
+            <header class="top-nav">
+                <div id="bible-verse" class="verse-text">Loading daily inspiration...</div>
+                <div class="header-right">
+                    <span id="clock">00:00:00</span>
+                    <span id="user-display" class="badge">Staff</span>
+                </div>
+            </header>
+
+            <div id="module-container" class="container-fluid">
+                <div id="dashboard-view">
+                    <h2>Welcome back!</h2>
+                    <div class="stats-row">
+                        <div class="stat-card"><h3>Daily Total</h3><p id="dash-collection">₱0.00</p></div>
+                        <div class="stat-card"><h3>Active Events</h3><p id="dash-events">0</p></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { checkAuth, logout } from './js/auth.js';
+        import { initStudents } from './js/students.js';
+
+        // Secure the page
+        checkAuth();
+
+        document.getElementById('logout-btn').addEventListener('click', logout);
+
+        // Simple Module Switcher
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                const module = e.currentTarget.dataset.module;
+                if(module === 'students') initStudents();
+                // Add other module initializers here
+            });
+        });
+
+        // Real-time Clock
+        setInterval(() => {
+            document.getElementById('clock').innerText = new Date().toLocaleTimeString();
+        }, 1000);
+    </script>
+</body>
+</html>
