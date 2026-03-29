@@ -8,16 +8,22 @@ export async function loginUser(email, password) {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         
-        // Fetch Role from Firestore
+        console.log("Logged in as:", user.uid); // Debugging
+
         const userDoc = await getDoc(doc(db, "users", user.uid));
+        
         if (userDoc.exists()) {
             const userData = userDoc.data();
-            localStorage.setItem('userRole', userData.role); // Cache role for UI speed
-            localStorage.setItem('orgId', userData.orgId);   // Multi-org support
+            localStorage.setItem('userRole', userData.role);
+            localStorage.setItem('orgId', userData.orgId);
             window.location.href = "dashboard.html";
+        } else {
+            console.error("No user document found for this UID!");
+            alert("Login successful, but no role assigned in Firestore.");
         }
     } catch (error) {
-        alert("Login Failed: " + error.message);
+        console.error("Auth Error:", error.code, error.message);
+        alert("Error: " + error.message);
     }
 }
 
