@@ -49,27 +49,83 @@
     </div>
 
     <script type="module">
-        import { checkAuth, logout } from './js/auth.js';
-        import { initStudents } from './js/students.js';
+    import { checkAuth, logout } from './js/auth.js';
+    import { initStudents } from './js/students.js';
+    import { initEvents } from './js/events.js';
+    import { initFinance } from './js/finance.js';
+    import { initAttendance } from './js/attendance.js';
 
-        // Secure the page
-        checkAuth();
+    // 1. Secure the page & Set User Profile
+    checkAuth();
+    const userRole = localStorage.getItem('userRole') || 'Staff';
+    document.getElementById('user-display').innerText = userRole;
 
-        document.getElementById('logout-btn').addEventListener('click', logout);
+    // 2. Logout functionality
+    document.getElementById('logout-btn').addEventListener('click', logout);
 
-        // Simple Module Switcher
-        document.querySelectorAll('.nav-link').forEach(link => {
-            link.addEventListener('click', (e) => {
-                const module = e.currentTarget.dataset.module;
-                if(module === 'students') initStudents();
-                // Add other module initializers here
-            });
+    // 3. Central Module Switcher (The Controller)
+    const switchModule = (moduleName) => {
+        // Clear active states on sidebar
+        document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+        
+        // Add active state to clicked link
+        const activeLink = document.querySelector(`[data-module="${moduleName}"]`);
+        if (activeLink) activeLink.classList.add('active');
+
+        // Initialize the specific module
+        switch (moduleName) {
+            case 'dashboard':
+                location.reload(); // Simplest way to return to the default dashboard view
+                break;
+            case 'students':
+                initStudents();
+                break;
+            case 'events':
+                initEvents();
+                break;
+            case 'finance':
+                initFinance();
+                break;
+            case 'attendance':
+                initAttendance();
+                break;
+            case 'settings':
+                // initSettings(); // For future build
+                alert("Settings module coming soon!");
+                break;
+            default:
+                console.warn("Module not found");
+        }
+    };
+
+    // Attach click events to all sidebar links
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const module = e.currentTarget.dataset.module;
+            switchModule(module);
         });
+    });
 
-        // Real-time Clock
-        setInterval(() => {
-            document.getElementById('clock').innerText = new Date().toLocaleTimeString();
-        }, 1000);
-    </script>
+    // 4. Bible Verse API Integration
+    async function fetchVerse() {
+        try {
+            const res = await fetch('https://labs.bible.org/api/?passage=votd&type=json');
+            const data = await res.json();
+            document.getElementById('bible-verse').innerText = `"${data[0].text}" - ${data[0].bookname} ${data[0].chapter}:${data[0].verse}`;
+        } catch (e) { 
+            document.getElementById('bible-verse').innerText = "Walk by faith, not by sight.";
+        }
+    }
+
+    // 5. Real-time Clock
+    setInterval(() => {
+        document.getElementById('clock').innerText = new Date().toLocaleTimeString();
+    }, 1000);
+
+    // Initial load
+    fetchVerse();
+</script>
+
 </body>
 </html>
