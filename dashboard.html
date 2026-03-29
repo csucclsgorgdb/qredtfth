@@ -5,43 +5,66 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HERO OMS | Dashboard</title>
     <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
     <div class="wrapper">
         <nav id="sidebar">
             <div class="sidebar-header">
-                <img src="assets/logo.png" alt="Logo" class="nav-logo">
-                <h3>EduFlow</h3>
+                <div class="logo-circle">
+                    <i data-lucide="shield-check" class="logo-icon"></i>
+                </div>
+                <div class="header-text">
+                    <h3>HERO</h3>
+                    <span>INTEGRATED SYSTEM</span>
+                </div>
+            </div>
+
+            <div class="user-profile-card">
+                <div class="user-avatar" id="avatar-initial">U</div>
+                <div class="user-info">
+                    <span class="user-name" id="user-name-display">Loading...</span>
+                    <span class="user-status" id="user-role-badge">STAFF</span>
+                </div>
             </div>
 
             <ul class="list-unstyled components">
-                <li><a href="#" class="nav-link" data-module="dashboard"><i class="fas fa-home"></i> Dashboard</a></li>
-                <li><a href="#" class="nav-link" data-module="students"><i class="fas fa-user-graduate"></i> Students</a></li>
-                <li><a href="#" class="nav-link" data-module="events"><i class="fas fa-calendar-star"></i> Events</a></li>
-                <li><a href="#" class="nav-link" data-module="finance"><i class="fas fa-wallet"></i> Finance</a></li>
-                <li><a href="#" class="nav-link" data-module="attendance"><i class="fas fa-clipboard-check"></i> Attendance</a></li>
-                <li class="admin-only"><a href="#" class="nav-link" data-module="settings"><i class="fas fa-cog"></i> Settings</a></li>
+                <li><a href="#" class="nav-link active" data-module="dashboard"><i data-lucide="layout-dashboard"></i> <span>Dashboard</span></a></li>
+                <li><a href="#" class="nav-link" data-module="students"><i data-lucide="users"></i> <span>Students</span></a></li>
+                <li><a href="#" class="nav-link" data-module="attendance"><i data-lucide="user-check"></i> <span>Attendance</span></a></li>
+                <li><a href="#" class="nav-link" data-module="finance"><i data-lucide="wallet"></i> <span>Finance</span></a></li>
+                <li><a href="#" class="nav-link admin-only" data-module="settings"><i data-lucide="settings"></i> <span>Settings</span></a></li>
             </ul>
 
-            <button id="logout-btn" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+            <button id="logout-btn" class="logout-btn">
+                <i data-lucide="log-out"></i> <span>Logout</span>
+            </button>
         </nav>
 
         <div id="content">
             <header class="top-nav">
-                <div id="bible-verse" class="verse-text">Loading daily inspiration...</div>
+                <div id="bible-verse" class="verse-text">"Loading daily inspiration..."</div>
                 <div class="header-right">
                     <span id="clock">00:00:00</span>
-                    <span id="user-display" class="badge">Staff</span>
                 </div>
             </header>
 
             <div id="module-container" class="container-fluid">
                 <div id="dashboard-view">
-                    <h2>Welcome back!</h2>
+                    <div class="module-header">
+                        <h1 class="module-title">Welcome Back!</h1>
+                        <p class="module-subtitle">Here is your organization's overview for today.</p>
+                    </div>
+                    
                     <div class="stats-row">
-                        <div class="stat-card"><h3>Daily Total</h3><p id="dash-collection">₱0.00</p></div>
-                        <div class="stat-card"><h3>Active Events</h3><p id="dash-events">0</p></div>
+                        <div class="stat-card">
+                            <h3>Total Collections</h3>
+                            <p id="dash-collection">₱0.00</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Active Events</h3>
+                            <p id="dash-events">0</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -49,83 +72,86 @@
     </div>
 
     <script type="module">
-    import { checkAuth, logout } from './js/auth.js';
-    import { initStudents } from './js/students.js';
-    import { initEvents } from './js/events.js';
-    import { initFinance } from './js/finance.js';
-    import { initAttendance } from './js/attendance.js';
+        import { checkAuth, logout } from './js/auth.js';
+        import { initStudents } from './js/students.js';
+        import { initEvents } from './js/events.js';
+        import { initFinance } from './js/finance.js';
+        import { initAttendance } from './js/attendance.js';
 
-    // 1. Secure the page & Set User Profile
-    checkAuth();
-    const userRole = localStorage.getItem('userRole') || 'Staff';
-    document.getElementById('user-display').innerText = userRole;
-
-    // 2. Logout functionality
-    document.getElementById('logout-btn').addEventListener('click', logout);
-
-    // 3. Central Module Switcher (The Controller)
-    const switchModule = (moduleName) => {
-        // Clear active states on sidebar
-        document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+        // 1. Auth & Profile Setup
+        checkAuth();
+        const userRole = localStorage.getItem('userRole') || 'Staff';
+        const userEmail = localStorage.getItem('userEmail') || 'User';
         
-        // Add active state to clicked link
-        const activeLink = document.querySelector(`[data-module="${moduleName}"]`);
-        if (activeLink) activeLink.classList.add('active');
+        document.getElementById('user-role-badge').innerText = userRole.toUpperCase();
+        document.getElementById('user-name-display').innerText = userEmail.split('@')[0];
+        document.getElementById('avatar-initial').innerText = userEmail.charAt(0).toUpperCase();
 
-        // Initialize the specific module
-        switch (moduleName) {
-            case 'dashboard':
-                location.reload(); // Simplest way to return to the default dashboard view
-                break;
-            case 'students':
-                initStudents();
-                break;
-            case 'events':
-                initEvents();
-                break;
-            case 'finance':
-                initFinance();
-                break;
-            case 'attendance':
-                initAttendance();
-                break;
-            case 'settings':
-                // initSettings(); // For future build
-                alert("Settings module coming soon!");
-                break;
-            default:
-                console.warn("Module not found");
+        // Hide admin-only links if not Super Admin
+        if(userRole !== 'Super Admin') {
+            document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
         }
-    };
 
-    // Attach click events to all sidebar links
-    document.querySelectorAll('.nav-link').forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            const module = e.currentTarget.dataset.module;
-            switchModule(module);
+        // 2. Module Switcher
+        const switchModule = (moduleName) => {
+            // UI Toggle
+            document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+            const activeLink = document.querySelector(`[data-module="${moduleName}"]`);
+            if (activeLink) activeLink.classList.add('active');
+
+            // Module Load
+            switch (moduleName) {
+                case 'dashboard':
+                    location.reload(); 
+                    break;
+                case 'students':
+                    initStudents();
+                    break;
+                case 'events':
+                    initEvents();
+                    break;
+                case 'finance':
+                    initFinance();
+                    break;
+                case 'attendance':
+                    initAttendance();
+                    break;
+                default:
+                    console.warn("Module not implemented");
+            }
+
+            // Re-render Lucide icons for injected HTML
+            setTimeout(() => lucide.createIcons(), 50);
+        };
+
+        // Event Listeners
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                switchModule(e.currentTarget.dataset.module);
+            });
         });
-    });
 
-    // 4. Bible Verse API Integration
-    async function fetchVerse() {
-        try {
-            const res = await fetch('https://labs.bible.org/api/?passage=votd&type=json');
-            const data = await res.json();
-            document.getElementById('bible-verse').innerText = `"${data[0].text}" - ${data[0].bookname} ${data[0].chapter}:${data[0].verse}`;
-        } catch (e) { 
-            document.getElementById('bible-verse').innerText = "Walk by faith, not by sight.";
+        document.getElementById('logout-btn').addEventListener('click', logout);
+
+        // 3. Utils (Verse & Clock)
+        async function fetchVerse() {
+            try {
+                const res = await fetch('https://labs.bible.org/api/?passage=votd&type=json');
+                const data = await res.json();
+                document.getElementById('bible-verse').innerText = `"${data[0].text}" - ${data[0].bookname}`;
+            } catch (e) { 
+                document.getElementById('bible-verse').innerText = "Walk by faith, not by sight.";
+            }
         }
-    }
 
-    // 5. Real-time Clock
-    setInterval(() => {
-        document.getElementById('clock').innerText = new Date().toLocaleTimeString();
-    }, 1000);
+        setInterval(() => {
+            document.getElementById('clock').innerText = new Date().toLocaleTimeString();
+        }, 1000);
 
-    // Initial load
-    fetchVerse();
-</script>
-
+        // Initialize
+        fetchVerse();
+        lucide.createIcons();
+    </script>
 </body>
 </html>
