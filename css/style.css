@@ -1,18 +1,26 @@
+/* 1. Global Variables & Reset */
 :root {
     --navy: #002147;
     --gold: #FFD700;
-    --white: #FFFFFF;
     --dark-gold: #c5a000;
+    --white: #FFFFFF;
     --bg-light: #f4f7f6;
+    --sidebar-width: 260px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
 }
 
 body {
     background-color: var(--bg-light);
-    margin: 0;
-    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
 }
 
-/* Login Page Specifics */
+/* 2. Login Page (Standalone Layout) */
 .login-page {
     height: 100vh;
     display: flex;
@@ -26,53 +34,117 @@ body {
     padding: 40px;
     border-radius: 12px;
     box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-    width: 100%;
+    width: 90%;
     max-width: 400px;
     text-align: center;
 }
 
-.login-logo { width: 80px; margin-bottom: 20px; }
-
-input {
+/* 3. Dashboard Wrapper Layout (Flexbox) */
+.wrapper {
+    display: flex;
     width: 100%;
-    padding: 12px;
-    margin: 10px 0;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    box-sizing: border-box;
+    align-items: stretch;
 }
 
-.btn-primary {
-    width: 100%;
-    padding: 12px;
-    background: var(--gold);
-    color: var(--navy);
-    border: none;
-    border-radius: 6px;
-    font-weight: bold;
-    cursor: pointer;
+/* Sidebar Styling */
+#sidebar {
+    width: var(--sidebar-width);
+    min-width: var(--sidebar-width);
+    background: var(--navy);
+    color: var(--white);
+    min-height: 100vh;
+    position: fixed;
+    transition: all 0.3s;
+    z-index: 1000;
+}
+
+.sidebar-header {
+    padding: 20px;
+    text-align: center;
+    background: rgba(0,0,0,0.1);
+}
+
+.nav-logo { width: 60px; margin-bottom: 10px; }
+
+#sidebar ul.components {
+    padding: 20px 0;
+    list-style: none;
+}
+
+#sidebar ul li a {
+    padding: 15px 25px;
+    display: block;
+    color: var(--white);
+    text-decoration: none;
+    font-size: 1.1em;
     transition: 0.3s;
 }
 
-.btn-primary:hover {
-    background: var(--dark-gold);
+#sidebar ul li a:hover, #sidebar ul li a.active {
+    background: var(--gold);
+    color: var(--navy);
+    font-weight: bold;
 }
 
-/* Sidebar Layout */
-.wrapper { display: flex; width: 100%; align-items: stretch; }
-#sidebar { min-width: 250px; max-width: 250px; background: var(--navy); color: #fff; min-height: 100vh; }
-#content { width: 100%; padding: 20px; min-height: 100vh; transition: all 0.3s; }
+.logout-btn {
+    width: 80%;
+    margin: 20px 10%;
+    padding: 10px;
+    background: transparent;
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    cursor: pointer;
+    border-radius: 4px;
+}
 
-/* Table Styling */
-.data-table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-.data-table th { background: var(--navy); color: var(--gold); padding: 15px; text-align: left; }
-.data-table td { padding: 12px 15px; border-bottom: 1px solid #eee; }
+/* 4. Main Content Area */
+#content {
+    width: 100%;
+    padding: 30px;
+    margin-left: var(--sidebar-width); /* Pushes content past the fixed sidebar */
+    min-height: 100vh;
+}
 
-/* Buttons */
+.top-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: white;
+    padding: 15px 25px;
+    border-radius: 8px;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+/* 5. Components & Tables */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+.data-table th {
+    background: var(--navy);
+    color: var(--gold);
+    padding: 15px;
+    text-align: left;
+}
+
+.data-table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid #eee;
+}
+
+/* 6. Buttons & Interactive Elements */
 .btn-gold { background: var(--gold); color: var(--navy); border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; }
 .btn-navy { background: var(--navy); color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+input { padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
 
-
+/* 7. Modules (Events, Attendance, Scan) */
 .event-card {
     background: white;
     padding: 20px;
@@ -92,11 +164,17 @@ input {
 
 .scan-feedback.success { background: #d4edda; color: #155724; border: 2px solid #c3e6cb; }
 .scan-feedback.info { background: #d1ecf1; color: #0c5460; border: 2px solid #bee5eb; }
-.scan-feedback.warning { background: #fff3cd; color: #856404; border: 2px solid #ffeeba; }
 
 #reader {
     border: 4px solid var(--navy) !important;
     border-radius: 15px;
     overflow: hidden;
+    margin: 20px auto;
 }
 
+/* Responsive */
+@media (max-width: 768px) {
+    #sidebar { margin-left: -260px; }
+    #content { margin-left: 0; }
+    .wrapper.active #sidebar { margin-left: 0; }
+}
