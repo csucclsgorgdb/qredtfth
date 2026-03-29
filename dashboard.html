@@ -198,4 +198,60 @@
             if (activeLink) activeLink.classList.add('active');
 
             // Reset modal root before switching modules
-            document.
+            document.getElementById('modal-root').innerHTML = '';
+
+            switch (moduleName) {
+                case 'dashboard':
+                    window.location.reload(); 
+                    break;
+                case 'students':
+                    initStudents();
+                    break;
+                case 'events':
+                    initEvents();
+                    break;
+                case 'finance':
+                    initFinance();
+                    break;
+                case 'attendance':
+                    initAttendance();
+                    break;
+                default:
+                    console.error("Module logic not found");
+            }
+
+            // Always refresh icons for dynamic content
+            setTimeout(() => lucide.createIcons(), 100);
+        };
+
+        // Sidebar Navigation Listeners
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                switchModule(e.currentTarget.dataset.module);
+            });
+        });
+
+        document.getElementById('logout-btn').onclick = logout;
+
+        // Verses & Clock
+        async function fetchVerse() {
+            try {
+                const res = await fetch('https://labs.bible.org/api/?passage=votd&type=json');
+                const data = await res.json();
+                document.getElementById('bible-verse').innerText = `"${data[0].text}" - ${data[0].bookname} ${data[0].chapter}:${data[0].verse}`;
+            } catch (e) { 
+                document.getElementById('bible-verse').innerText = "Walk by faith, not by sight.";
+            }
+        }
+
+        setInterval(() => {
+            const timeEl = document.getElementById('clock');
+            if(timeEl) timeEl.innerText = new Date().toLocaleTimeString();
+        }, 1000);
+
+        fetchVerse();
+        lucide.createIcons();
+    </script>
+</body>
+</html>
