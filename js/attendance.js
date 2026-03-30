@@ -1,13 +1,20 @@
 import { db } from './firebase-config.js';
 import { 
-    collection, doc, getDoc, getDocs, setDoc, updateDoc, query, where, serverTimestamp 
+    collection, doc, getDoc, getDocs, setDoc, updateDoc, query, where, serverTimestamp, limit, startAfter, orderBy 
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 let html5QrCode;
 let eventDataMap = {};
 let isScannerActive = false;
 
-// --- DYNAMIC CLASSIFICATION ---
+// Pagination State
+let lastVisibleStudent = null;
+let currentPage = 1;
+const PAGE_SIZE = 15;
+
+/**
+ * DYNAMIC CLASSIFICATION
+ */
 function classifyStudent(course) {
     if (!course) return "Other";
     const c = course.toUpperCase();
@@ -22,14 +29,13 @@ function classifyStudent(course) {
 export async function initAttendance() {
     const container = document.getElementById('module-container');
     
-    // 1. Fetch Ongoing Events para sa Top Bar
+    // Fetch Ongoing Events
     const q = query(collection(db, "events"), where("status", "==", "Ongoing"));
     const eventSnap = await getDocs(q);
     
     let eventOptions = eventSnap.docs.map(d => {
-        const data = d.data();
-        eventDataMap[d.id] = data;
-        return `<option value="${d.id}">${data.name}</option>`;
+        eventDataMap[d.id] = d.data();
+        return `<option value="${d.id}">${d.data().name}</option>`;
     }).join('');
 
     container.innerHTML = `
@@ -53,12 +59,11 @@ export async function initAttendance() {
         <div class="dashboard-grid" style="grid-template-columns: 1fr 1.6fr; gap:20px;">
             
             <div style="display:flex; flex-direction:column; gap:15px;">
-                
-                <div class="dashboard-card" style="padding:10px; position:relative;">
-                    <div id="scanner-container" style="width:100%; border-radius:15px; overflow:hidden; border:3px solid var(--hero-navy); background:#000; min-height:250px; display:none;">
+                <div class="dashboard-card" style="padding:10px; position:relative; background:#000; border-radius:15px; min-height:250px;">
+                    <div id="scanner-container" style="width:100%; border-radius:10px; overflow:hidden; display:none;">
                         <div id="reader"></div>
                     </div>
-                    <div id="camera-placeholder" style="width:100%; height:250px; border-radius:15px; border:2px dashed #cbd5e1; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#94a3b8; background:#f8fafc;">
+                    <div id="camera-placeholder" style="width:100%; height:250px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#94a3b8;">
                         <i data-lucide="camera-off" style="width:40px; height:40px; margin-bottom:10px; opacity:0.5;"></i>
                         <p style="font-size:13px; font-weight:600;">Camera is currently closed</p>
                     </div>
@@ -82,22 +87,29 @@ export async function initAttendance() {
             <div class="dashboard-card">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                     <h3 style="margin:0;"><i data-lucide="users"></i> Participants List</h3>
-                    <button id="btn-export-csv" class="btn-gold" style="padding:5px 12px; font-size:11px;">Download CSV</button>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <div style="display:flex; gap:5px; align-items:center; background:#f1f5f9; padding:5px; border-radius:8px;">
+                            <button id="prev-page" class="btn-gold" style="padding:2px 8px; height:30px;"><</button>
+                            <span id="page-num" style="font-size:11px; font-weight:800; min-width:40px; text-align:center;">Pg 1</span>
+                            <button id="next-page" class="btn-gold" style="padding:2px 8px; height:30px;">></button>
+                        </div>
+                        <button id="btn-export-csv" class="btn-gold" style="padding:5px 12px; font-size:11px;">CSV</button>
+                    </div>
                 </div>
                 <div class="data-table-container" style="max-height: 520px; overflow-y:auto;">
-                    <table class="data-table" style="font-size:11px;">
+                    <table class="data-table" style="font-size:10px;">
                         <thead>
                             <tr>
-                                <th>STUDENT NAME</th>
+                                <th>NAME</th>
                                 <th>ID & DEPT</th>
-                                <th>COURSE & YEAR</th>
-                                <th>TIME IN</th>
-                                <th>TIME OUT</th>
+                                <th>COURSE/YR</th>
+                                <th>IN</th>
+                                <th>OUT</th>
                                 <th>STATUS</th>
                             </tr>
                         </thead>
                         <tbody id="attendance-tbody">
-                            <tr><td colspan="6" style="text-align:center; padding:40px; color:#94a3b8;">Select event to start syncing...</td></tr>
+                            <tr><td colspan="6" style="text-align:center; padding:40px; color:#94a3b8;">Select event to start...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -110,7 +122,7 @@ export async function initAttendance() {
 }
 
 /**
- * SETUP EVENT LISTENERS
+ * EVENT LISTENERS
  */
 function setupEventListeners() {
     const eventSelect = document.getElementById('attendance-event-id');
@@ -119,51 +131,58 @@ function setupEventListeners() {
     const cameraBtn = document.getElementById('btn-toggle-camera');
     const exportBtn = document.getElementById('btn-export-csv');
 
-    // Process input function
     const processInput = () => {
         const val = manualInput.value.trim();
-        if (val) {
-            handleAttendanceInput(val);
-            manualInput.value = "";
-        }
+        if (val) { handleAttendanceInput(val); manualInput.value = ""; }
     };
 
-    manualInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') processInput(); });
-    manualBtn.onclick = () => processInput();
+    manualInput.onkeypress = (e) => { if (e.key === 'Enter') processInput(); };
+    manualBtn.onclick = processInput;
     cameraBtn.onclick = () => toggleCameraScanner(cameraBtn);
-    exportBtn.onclick = () => exportToCSV();
+    exportBtn.onclick = exportToCSV;
     
-    eventSelect.onchange = (e) => {
-        if (e.target.value) refreshAttendanceTable(e.target.value);
+    eventSelect.onchange = () => {
+        currentPage = 1;
+        lastVisibleStudent = null;
+        refreshAttendanceTable();
     };
 
-    // Auto-focus Logic: ibinabalik ang focus sa input unless clicking buttons/selects
+    document.getElementById('next-page').onclick = () => { currentPage++; refreshAttendanceTable(); };
+    document.getElementById('prev-page').onclick = () => { 
+        if(currentPage > 1) { 
+            currentPage--; 
+            lastVisibleStudent = null; // Basic reset logic for simplicity
+            refreshAttendanceTable(); 
+        } 
+    };
+
+    // Auto-focus Logic (Smart Focus)
     document.addEventListener('click', (e) => {
-        const isInteractive = e.target.closest('select') || e.target.closest('button') || e.target.closest('input');
-        if (!isInteractive) manualInput.focus();
+        const isInteractive = e.target.closest('select') || e.target.closest('button') || e.target.closest('input') || e.target.closest('nav');
+        if (!isInteractive && manualInput) manualInput.focus();
     });
 }
 
 /**
- * CAMERA SCANNER LOGIC
+ * SCANNER LOGIC
  */
-function toggleCameraScanner(btn) {
+async function toggleCameraScanner(btn) {
     const container = document.getElementById('scanner-container');
     const placeholder = document.getElementById('camera-placeholder');
     const btnText = btn.querySelector('span');
 
     if (isScannerActive) {
-        if(html5QrCode) html5QrCode.stop();
+        if(html5QrCode) await html5QrCode.stop();
         container.style.display = 'none';
         placeholder.style.display = 'flex';
         btnText.innerText = "Open Camera";
-        btn.style.background = ""; // revert to gold
+        btn.style.background = "";
         isScannerActive = false;
     } else {
         container.style.display = 'block';
         placeholder.style.display = 'none';
         btnText.innerText = "Close Camera";
-        btn.style.background = "#ef4444"; // red for close
+        btn.style.background = "#ef4444";
         
         setTimeout(() => {
             html5QrCode = new Html5Qrcode("reader");
@@ -176,17 +195,17 @@ function toggleCameraScanner(btn) {
                 }
             ).catch(err => console.error(err));
             isScannerActive = true;
-        }, 500);
+        }, 300);
     }
     lucide.createIcons();
 }
 
 /**
- * CENTRALIZED INPUT HANDLER
+ * ATTENDANCE LOGIC
  */
 async function handleAttendanceInput(studentId) {
     const eventId = document.getElementById('attendance-event-id').value;
-    if (!eventId) return Swal.fire('Wait!', 'Please select an event first.', 'warning');
+    if (!eventId) return Swal.fire('Wait!', 'Select event first.', 'warning');
 
     const beep = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
     const errorSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2873/2873-preview.mp3');
@@ -206,9 +225,9 @@ async function handleAttendanceInput(studentId) {
         const student = studentSnap.data();
         const event = eventSnap.data();
         const studentDept = classifyStudent(student.course);
-        const studentYear = student.yearLevel.toString();
 
-        if ((event.targetDept !== "ALL" && event.targetDept !== studentDept) || !event.targetYears.includes(studentYear)) {
+        // Eligibility Check
+        if ((event.targetDept !== "ALL" && event.targetDept !== studentDept) || !event.targetYears.includes(student.yearLevel.toString())) {
             updateUI(student.fullName, "NOT ELIGIBLE", "danger");
             errorSound.play();
             return;
@@ -233,25 +252,37 @@ async function handleAttendanceInput(studentId) {
         }
 
         beep.play();
-        refreshAttendanceTable(eventId);
+        refreshAttendanceTable();
     } catch (err) { console.error(err); }
 }
 
 /**
- * REFRESH TABLE & EXPORT
+ * TABLE REFRESH WITH PAGINATION
  */
-async function refreshAttendanceTable(eventId) {
+async function refreshAttendanceTable() {
+    const eventId = document.getElementById('attendance-event-id').value;
     const tbody = document.getElementById('attendance-tbody');
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px;">Updating List...</td></tr>`;
+    if (!eventId) return;
+
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px;">Loading Page ${currentPage}...</td></tr>`;
 
     try {
-        const [eventSnap, studentsSnap, logsSnap] = await Promise.all([
-            getDoc(doc(db, "events", eventId)),
-            getDocs(collection(db, "students")),
+        const event = eventDataMap[eventId];
+        let studentQuery = query(collection(db, "students"), orderBy("fullName"), limit(PAGE_SIZE));
+
+        // Para sa "Next" page
+        if (currentPage > 1 && lastVisibleStudent) {
+            studentQuery = query(collection(db, "students"), orderBy("fullName"), startAfter(lastVisibleStudent), limit(PAGE_SIZE));
+        }
+
+        const [studentsSnap, logsSnap] = await Promise.all([
+            getDocs(studentQuery),
             getDocs(query(collection(db, "attendance"), where("eventId", "==", eventId)))
         ]);
 
-        const event = eventSnap.data();
+        lastVisibleStudent = studentsSnap.docs[studentsSnap.docs.length - 1];
+        document.getElementById('page-num').innerText = `Pg ${currentPage}`;
+
         const logs = {};
         logsSnap.forEach(d => logs[d.data().studentId] = d.data());
 
@@ -259,18 +290,18 @@ async function refreshAttendanceTable(eventId) {
         studentsSnap.forEach(sDoc => {
             const student = sDoc.data();
             const sDept = classifyStudent(student.course);
+            
             if ((event.targetDept === "ALL" || event.targetDept === sDept) && event.targetYears.includes(student.yearLevel.toString())) {
                 const log = logs[sDoc.id];
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td><b>${student.fullName}</b></td>
-                    <td>${sDoc.id}<br><small>${sDept}</small></td>
-                    <td>${student.course} - Yr ${student.yearLevel}</td>
-                    <td>${log ? log.timeIn : '--:--'}</td>
-                    <td>${log ? (log.timeOut || '--:--') : '--:--'}</td>
-                    <td>${log ? (log.status === 'Present' ? '<span class="badge-success">PRESENT</span>' : '<span class="badge-warning">IN VENUE</span>') : '<span class="badge-danger">ABSENT</span>'}</td>
-                `;
-                tbody.appendChild(row);
+                tbody.innerHTML += `
+                    <tr>
+                        <td><b>${student.fullName}</b></td>
+                        <td>${sDoc.id}<br><small>${sDept}</small></td>
+                        <td>${student.course} - ${student.yearLevel}</td>
+                        <td>${log ? log.timeIn : '--:--'}</td>
+                        <td>${log ? (log.timeOut || '--:--') : '--:--'}</td>
+                        <td>${log ? (log.status === 'Present' ? '✅ PRESENT' : '⏳ IN VENUE') : '❌ ABSENT'}</td>
+                    </tr>`;
             }
         });
     } catch (err) { console.error(err); }
