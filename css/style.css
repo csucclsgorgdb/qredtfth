@@ -15,7 +15,7 @@
     --border-color: #e2e8f0;
     --sidebar-width: 280px;
     --card-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* --- 2. GLOBAL RESET & SCROLLBAR --- */
@@ -40,17 +40,39 @@ body {
 
 /* --- 3. SIDEBAR (HERO NAVY/GOLD) --- */
 #sidebar {
-    width: var(--sidebar-width);
+    width: var(--sidebar-width) !important;
+    min-width: var(--sidebar-width);
     background: linear-gradient(180deg, var(--hero-navy) 0%, var(--hero-navy-dark) 100%);
     color: var(--white);
     height: 100vh;
     position: fixed;
-    left: 0; top: 0;
+    left: 0; 
+    top: 0;
     padding: 24px 16px;
     z-index: 1000;
     display: flex;
-    flex-direction: column;
+    flex-direction: column; /* This allows us to use flex-grow */
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
+    transition: var(--transition);
+    overflow-x: hidden; /* Prevents text from leaking out during transitions */
+}
+
+/* --- SIDEBAR TOGGLE SYSTEM --- */
+#sidebar.collapsed {
+    width: 80px !important;
+    min-width: 80px !important;
+}
+
+#sidebar.collapsed .header-text,
+#sidebar.collapsed .user-info,
+#sidebar.collapsed .nav-link span {
+    display: none; /* Prevents text overflow */
+}
+
+#sidebar.collapsed .user-profile-card,
+#sidebar.collapsed .nav-link {
+    justify-content: center;
+    padding: 12px 0;
 }
 
 .sidebar-header {
@@ -74,17 +96,79 @@ body {
 
 .logo-icon { color: var(--hero-navy); width: 24px; height: 24px; }
 
-.nav-link {
+/* --- USER PROFILE CARD (TOP) --- */
+.user-profile-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    padding: 15px;
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px 16px;
+    margin-bottom: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.user-avatar {
+    width: 42px;
+    height: 42px;
+    background: var(--hero-gold);
+    color: var(--hero-navy);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-size: 1.2rem;
+    box-shadow: 0 4px 12px var(--hero-gold-glow);
+}
+
+.user-info { display: flex; flex-direction: column; }
+
+.user-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: white;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
+}
+
+#user-role-badge {
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: var(--hero-gold); /* Gold for Admin status */
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+/* --- MAIN NAVIGATION (MIDDLE) --- */
+.components {
+    list-style: none;
+    padding: 0;
+    margin: 20px 0 0 0;
+    flex-grow: 1; /* This pushes the footer down */
+    overflow-y: auto;
+}
+
+.components li { margin-bottom: 5px; }
+
+.components::-webkit-scrollbar { width: 4px; }
+.components::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: 15px; /* Spacing between icon and text */
+    padding: 12px 20px;
+    width: 100%;
     color: #94a3b8;
     text-decoration: none;
     border-radius: 12px;
     margin-bottom: 6px;
     transition: var(--transition);
     font-weight: 500;
+    white-space: nowrap; /* Prevents text from wrapping to a second line */
 }
 
 .nav-link:hover { background: rgba(255, 255, 255, 0.05); color: var(--white); }
@@ -96,12 +180,62 @@ body {
     box-shadow: 0 4px 15px var(--hero-gold-glow);
 }
 
+/* Ensure icons have a fixed size so they don't shrink */
+.nav-link i, .nav-link svg {
+    width: 20px;
+    min-width: 20px;
+    height: 20px;
+    stroke-width: 2.5px;
+}
+
+.nav-link span {
+    display: inline-block;
+    opacity: 1;
+    transition: opacity 0.3s;
+}
+
+/* --- SIDEBAR FOOTER (BOTTOM) --- */
+.sidebar-footer {
+    padding-top: 20px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    margin-top: auto;
+}
+
+.logout-btn {
+    width: 100%;
+    margin-top: 10px;
+    background: white;
+    color: var(--hero-navy);
+    border: none;
+    border-radius: 8px;
+    padding: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.logout-btn:hover {
+    background: #ef4444; /* Alert Red */
+    color: white;
+    transform: translateY(-2px);
+}
+
 /* --- 4. MAIN CONTENT & TOP NAV --- */
 #content {
     margin-left: var(--sidebar-width);
     width: calc(100% - var(--sidebar-width));
     padding: 40px;
     min-height: 100vh;
+    transition: var(--transition);
+}
+
+#content.expanded {
+    margin-left: 80px;
+    width: calc(100% - 80px);
 }
 
 .top-nav {
@@ -254,22 +388,16 @@ body {
     border-radius: 12px;
     background: #f8fafc;
     width: 280px;
+    height: 40px;
     transition: var(--transition);
+    font-size: 0.9rem;
+    color: var(--hero-navy);
 }
 .search-box input:focus { width: 350px; background: white; border-color: var(--hero-gold); box-shadow: 0 0 0 4px var(--hero-gold-glow); outline: none; }
 
 .pagination-container { display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 30px; }
 .nav-btn { width: 42px; height: 42px; border-radius: 12px; border: 1px solid var(--border-color); background: white; cursor: pointer; transition: var(--transition); }
 .nav-btn:hover:not(:disabled) { background: var(--hero-gold); border-color: var(--hero-gold); }
-
-/* --- 9. RESPONSIVE --- */
-@media (max-width: 1024px) {
-    #sidebar { width: 85px; padding: 20px 10px; }
-    #sidebar span, #sidebar .header-text, #sidebar .user-info { display: none; }
-    #content { margin-left: 85px; width: calc(100% - 85px); }
-    .nav-link { justify-content: center; }
-    .dashboard-grid { grid-template-columns: 1fr; }
-}
 
 /* --- BUTTON BASE STYLES --- */
 .btn-navy, .btn-gold {
@@ -285,68 +413,16 @@ body {
     letter-spacing: 0.5px;
     border: none;
     cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    height: 42px; /* Uniform height for alignment */
+    transition: var(--transition);
+    height: 42px; /* Uniform height */
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-/* --- BULK IMPORT (NAVY) --- */
-.btn-navy {
-    background-color: var(--hero-navy);
-    color: #ffffff;
-}
+.btn-navy { background-color: var(--hero-navy); color: #ffffff; }
+.btn-navy:hover { background-color: var(--hero-navy-light); transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 26, 61, 0.2); }
 
-.btn-navy:hover {
-    background-color: var(--hero-navy-light);
-    transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgba(0, 26, 61, 0.2);
-}
-
-.btn-navy:active {
-    transform: translateY(0);
-}
-
-/* --- ADD STUDENT (GOLD) --- */
-.btn-gold {
-    background-color: var(--hero-gold);
-    color: var(--hero-navy);
-}
-
-.btn-gold:hover {
-    background-color: #f5c200; /* Slightly deeper gold for hover */
-    transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px var(--hero-gold-glow);
-}
-
-.btn-gold:active {
-    transform: translateY(0);
-}
-
-/* --- ICON ALIGNMENT --- */
-.btn-navy i, .btn-gold i {
-    width: 18px;
-    height: 18px;
-    stroke-width: 2.5px; /* Makes Lucide icons look bolder and more premium */
-}
-
-/* --- SEARCH BOX ALIGNMENT --- */
-.search-box input {
-    height: 40px;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding-left: 40px;
-    font-size: 0.9rem;
-    color: var(--hero-navy);
-    transition: all 0.2s ease;
-}
-
-.search-box input:focus {
-    border-color: var(--hero-gold);
-    box-shadow: 0 0 0 3px var(--hero-gold-glow);
-    outline: none;
-    width: 280px; /* Slight expansion on focus */
-}
-
+.btn-gold { background-color: var(--hero-gold); color: var(--hero-navy); }
+.btn-gold:hover { background-color: #f5c200; transform: translateY(-2px); box-shadow: 0 10px 15px -3px var(--hero-gold-glow); }
 
 /* --- 10. LOGIN PAGE STYLES (INDEX.HTML) --- */
 body.login-page {
@@ -371,27 +447,10 @@ body.login-page {
     animation: fadeInScale 0.5s ease-out;
 }
 
-.login-logo {
-    width: 80px;
-    height: 80px;
-    margin-bottom: 20px;
-    object-fit: contain;
-}
+.login-logo { width: 80px; height: 80px; margin-bottom: 20px; object-fit: contain; }
+.login-card h2 { font-weight: 800; font-size: 1.5rem; margin-bottom: 30px; letter-spacing: -0.5px; }
 
-.login-card h2 {
-    font-weight: 800;
-    font-size: 1.5rem;
-    margin-bottom: 30px;
-    letter-spacing: -0.5px;
-}
-
-/* Login Form Inputs */
-#login-form {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-
+#login-form { display: flex; flex-direction: column; gap: 15px; }
 #login-form input {
     width: 100%;
     padding: 14px 18px;
@@ -401,15 +460,8 @@ body.login-page {
     transition: var(--transition);
     background: #f8fafc;
 }
+#login-form input:focus { border-color: var(--hero-gold); background: white; box-shadow: 0 0 0 4px var(--hero-gold-glow); outline: none; }
 
-#login-form input:focus {
-    border-color: var(--hero-gold);
-    background: white;
-    box-shadow: 0 0 0 4px var(--hero-gold-glow);
-    outline: none;
-}
-
-/* Primary Button for Login */
 .btn-primary {
     background: var(--hero-navy);
     color: white;
@@ -425,48 +477,20 @@ body.login-page {
     letter-spacing: 1px;
 }
 
-.btn-primary:hover {
-    background: var(--hero-navy-light);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 15px rgba(0, 26, 61, 0.3);
-}
-
-.btn-primary:active {
-    transform: translateY(0);
-}
-
-/* Animation for smooth entrance */
 @keyframes fadeInScale {
-    from {
-        opacity: 0;
-        transform: scale(0.95) translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1) translateY(0);
-    }
-}
-
-/* Mobile adjustments */
-@media (max-width: 480px) {
-    .login-card {
-        margin: 20px;
-        padding: 30px 20px;
-    }
+    from { opacity: 0; transform: scale(0.95) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 /* --- 11. SWEETALERT2 PREMIUM OVERRIDES --- */
-
-/* Modal Container */
 .swal2-popup {
     border-radius: 24px !important;
     padding: 2rem !important;
     background: var(--white) !important;
     box-shadow: 0 25px 50px -12px rgba(0, 26, 61, 0.25) !important;
-    border-top: 8px solid var(--hero-gold) !important; /* HERO Brand Accent */
+    border-top: 8px solid var(--hero-gold) !important;
 }
 
-/* Title Styling */
 .swal2-title {
     color: var(--hero-navy) !important;
     font-weight: 800 !important;
@@ -476,7 +500,6 @@ body.login-page {
     margin-bottom: 20px !important;
 }
 
-/* Input Fields inside Modal */
 .swal2-input, .swal2-select, .swal2-textarea {
     border-radius: 12px !important;
     border: 1.5px solid var(--border-color) !important;
@@ -484,29 +507,9 @@ body.login-page {
     height: 48px !important;
     background: #f8fafc !important;
     transition: var(--transition) !important;
-    box-shadow: none !important;
     color: var(--hero-navy) !important;
 }
 
-.swal2-input:focus {
-    border-color: var(--hero-gold) !important;
-    background: white !important;
-    box-shadow: 0 0 0 4px var(--hero-gold-glow) !important;
-}
-
-/* Label Styling (For your custom HTML in students.js) */
-.swal2-html-container label {
-    font-size: 11px !important;
-    font-weight: 700 !important;
-    color: var(--text-muted) !important;
-    display: block !important;
-    margin-bottom: 5px !important;
-    margin-top: 10px !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.5px !important;
-}
-
-/* Confirm Button (Navy) */
 .swal2-confirm {
     background-color: var(--hero-navy) !important;
     color: white !important;
@@ -515,279 +518,30 @@ body.login-page {
     padding: 12px 30px !important;
     text-transform: uppercase !important;
     letter-spacing: 1px !important;
-    transition: var(--transition) !important;
 }
 
-.swal2-confirm:hover {
-    background-color: var(--hero-navy-light) !important;
-    transform: translateY(-2px) !important;
-    box-shadow: 0 8px 15px rgba(0, 26, 61, 0.2) !important;
+/* --- 12. RESPONSIVE --- */
+@media (max-width: 1024px) {
+    /* Auto-collapse sidebar on smaller screens if manual toggle hasn't been used */
+    #sidebar:not(.collapsed) { 
+        width: 85px !important; 
+        min-width: 85px; 
+        padding: 20px 10px; 
+    }
+    #sidebar:not(.collapsed) span, 
+    #sidebar:not(.collapsed) .header-text, 
+    #sidebar:not(.collapsed) .user-info { display: none; }
+    
+    #content:not(.expanded) { 
+        margin-left: 85px; 
+        width: calc(100% - 85px); 
+    }
+    
+    .nav-link { justify-content: center; }
+    .dashboard-grid { grid-template-columns: 1fr; }
 }
 
-/* Cancel Button */
-.swal2-cancel {
-    background-color: transparent !important;
-    color: var(--text-muted) !important;
-    font-weight: 600 !important;
-    border-radius: 12px !important;
-    transition: var(--transition) !important;
-}
-
-.swal2-cancel:hover {
-    background-color: #f1f5f9 !important;
-    color: var(--hero-navy) !important;
-}
-
-/* Icon Colors (Success/Error/Warning) */
-.swal2-icon.swal2-success {
-    border-color: var(--hero-gold) !important;
-}
-.swal2-icon.swal2-success [class^='swal2-success-line'] {
-    background-color: var(--hero-gold) !important;
-}
-.swal2-icon.swal2-success .swal2-success-ring {
-    border: 4px solid rgba(255, 204, 0, 0.3) !important;
-}
-
-/* --- SIDEBAR FLEX LAYOUT --- */
-#sidebar {
-    width: 280px;
-    height: 100vh;
-    position: fixed;
-    left: 0;
-    top: 0;
-    background: linear-gradient(180deg, var(--hero-navy) 0%, var(--hero-navy-dark) 100%);
-    color: white;
-    display: flex;
-    flex-direction: column; /* Stack vertically */
-    padding: 30px 16px;
-    z-index: 1000;
-    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
-}
-
-/* --- USER PROFILE CARD (TOP) --- */
-.user-profile-card {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 16px;
-    padding: 15px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 25px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.user-avatar {
-    width: 42px;
-    height: 42px;
-    background: var(--hero-gold);
-    color: var(--hero-navy);
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 900;
-    font-size: 1.2rem;
-    box-shadow: 0 4px 12px var(--hero-gold-glow);
-}
-
-.user-info { display: flex; flex-direction: column; }
-
-.user-name {
-    font-weight: 600;
-    font-size: 0.9rem;
-    color: white;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 150px;
-}
-
-#user-role-badge {
-    font-size: 0.7rem;
-    font-weight: 800;
-    color: var(--hero-gold); /* Gold for Admin status */
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-}
-
-/* --- MAIN NAVIGATION (MIDDLE) --- */
-.components {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    flex-grow: 1; /* This pushes the footer down */
-}
-
-.components li { margin-bottom: 5px; }
-
-/* --- SIDEBAR FOOTER (BOTTOM) --- */
-.logout-btn {
-    width: 100%;
-    background: white;
-    color: var(--hero-navy);
-    padding: 12px;
-    border: none;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: var(--transition);
-    margin-top: 15px; /* Spacing from Settings link */
-}
-
-.logout-btn:hover {
-    background: #ef4444; /* Alert Red */
-    color: white;
-    transform: translateY(-2px);
-}
-
-/* --- SIDEBAR SCROLLBAR (If nav is too long) --- */
-.components {
-    overflow-y: auto;
-}
-.components::-webkit-scrollbar { width: 4px; }
-.components::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
-
-
-/* Ensure the sidebar has a locked, consistent width */
-#sidebar {
-    width: 280px !important; /* Forces the width seen in your dashboard */
-    min-width: 280px;
-    height: 100vh;
-    position: fixed;
-    display: flex;
-    flex-direction: column;
-    transition: all 0.3s ease;
-    overflow-x: hidden; /* Prevents text from leaking out during transitions */
-}
-
-/* Fix the navigation links so text and icons align horizontally */
-.nav-link {
-    display: flex;
-    align-items: center;
-    gap: 15px; /* Spacing between icon and text */
-    padding: 12px 20px;
-    width: 100%;
-    text-decoration: none;
-    white-space: nowrap; /* Prevents text from wrapping to a second line */
-}
-
-/* Ensure icons have a fixed size so they don't shrink */
-.nav-link i, .nav-link svg {
-    width: 20px;
-    min-width: 20px;
-    height: 20px;
-}
-
-/* Make sure the text labels are visible */
-.nav-link span {
-    display: inline-block;
-    opacity: 1;
-    transition: opacity 0.3s;
-}
-
-#sidebar {
-    width: 280px;
-    height: 100vh;
-    position: fixed;
-    left: 0;
-    top: 0;
-    display: flex;
-    flex-direction: column; /* This allows us to use flex-grow */
-    background: var(--hero-navy);
-    padding: 20px;
-    transition: all 0.3s ease;
-    z-index: 1000;
-}
-
-/* This pushes the footer to the bottom */
-.components {
-    flex-grow: 1; 
-    margin-top: 20px;
-    overflow-y: auto;
-}
-
-/* Ensure Nav Links stay visible and horizontal */
-.nav-link {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    padding: 12px 15px;
-    color: rgba(255,255,255,0.7);
-    text-decoration: none;
-    white-space: nowrap; /* Prevents text from disappearing */
-}
-
-/* Fix for the Logout Button at the bottom */
-.sidebar-footer {
-    padding-top: 20px;
-    border-top: 1px solid rgba(255,255,255,0.1);
-}
-
-.logout-btn {
-    width: 100%;
-    margin-top: 10px;
-    background: white;
-    color: var(--hero-navy);
-    border: none;
-    border-radius: 8px;
-    padding: 10px;
-    font-weight: bold;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    cursor: pointer;
-}
-
-/* --- SIDEBAR TOGGLE SYSTEM --- */
-#sidebar {
-    width: 280px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    display: flex;
-    flex-direction: column;
-}
-
-#content {
-    margin-left: 280px;
-    width: calc(100% - 280px);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Collapsed State */
-#sidebar.collapsed {
-    width: 80px;
-    min-width: 80px;
-}
-
-#sidebar.collapsed .header-text,
-#sidebar.collapsed .user-info,
-#sidebar.collapsed .nav-link span {
-    display: none; /* Prevents text overflow seen in your screenshot */
-}
-
-#sidebar.collapsed .user-profile-card,
-#sidebar.collapsed .nav-link {
-    justify-content: center;
-    padding: 12px 0;
-}
-
-#content.expanded {
-    margin-left: 80px;
-    width: calc(100% - 80px);
-}
-
-/* Sidebar Footer should always stay at bottom */
-.components {
-    flex-grow: 1;
-}
-
-.sidebar-footer {
-    border-top: 1px solid rgba(255,255,255,0.1);
-    padding-top: 15px;
-    margin-top: auto;
+@media (max-width: 480px) {
+    .login-card { margin: 20px; padding: 30px 20px; }
+    .stats-row { grid-template-columns: 1fr; }
 }
