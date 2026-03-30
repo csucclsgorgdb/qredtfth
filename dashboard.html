@@ -61,6 +61,13 @@
             font-weight: 800;
         }
 
+        /* Sidebar Toggle Utility */
+        #sidebar.collapsed { width: 80px; min-width: 80px; }
+        #sidebar.collapsed .header-text, 
+        #sidebar.collapsed .user-info, 
+        #sidebar.collapsed .nav-link span { display: none; }
+        #content.expanded { margin-left: 80px; width: calc(100% - 80px); }
+
         @media (max-width: 992px) {
             .dashboard-grid { grid-template-columns: 1fr; }
         }
@@ -69,48 +76,54 @@
 <body>
     <div class="wrapper">
         <nav id="sidebar">
-    <div class="sidebar-top">
-        <div class="sidebar-header">
-            <div class="logo-circle">
-                <i data-lucide="shield-check" class="logo-icon"></i>
-            </div>
-            <div class="header-text">
-                <h3>HERO</h3>
-                <span>WEB SYSTEM</span>
-            </div>
-        </div>
+            <div class="sidebar-top">
+                <div class="sidebar-header">
+                    <div class="logo-circle">
+                        <i data-lucide="shield-check" class="logo-icon"></i>
+                    </div>
+                    <div class="header-text">
+                        <h3>HERO</h3>
+                        <span>WEB SYSTEM</span>
+                    </div>
+                </div>
 
-        <div class="user-profile-card">
-            <div class="user-avatar" id="avatar-initial">U</div>
-            <div class="user-info">
-                <span class="user-name" id="user-name-display">Loading...</span>
-                <span class="user-status" id="user-role-badge">STAFF</span>
+                <div class="user-profile-card">
+                    <div class="user-avatar" id="avatar-initial">U</div>
+                    <div class="user-info">
+                        <span class="user-name" id="user-name-display">Loading...</span>
+                        <span class="user-status" id="user-role-badge">STAFF</span>
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
 
-    <ul class="list-unstyled components">
-        <li><a href="#" class="nav-link active" data-module="dashboard"><i data-lucide="layout-dashboard"></i> <span>Dashboard</span></a></li>
-        <li><a href="#" class="nav-link" data-module="students"><i data-lucide="users"></i> <span>Students</span></a></li>
-        <li><a href="#" class="nav-link" data-module="events"><i data-lucide="calendar-days"></i> <span>Events</span></a></li>
-        <li><a href="#" class="nav-link" data-module="attendance"><i data-lucide="user-check"></i> <span>Attendance</span></a></li>
-        <li><a href="#" class="nav-link" data-module="finance"><i data-lucide="wallet"></i> <span>Finance</span></a></li>
-    </ul> <div class="sidebar-footer">
-        <li class="admin-only" style="list-style:none;">
-            <a href="#" class="nav-link" data-module="settings" style="border-top: 1px solid rgba(255,255,255,0.1); padding-top:15px;">
-                <i data-lucide="settings"></i> <span>Settings</span>
-            </a>
-        </li>
-        <button id="logout-btn" class="logout-btn">
-            <i data-lucide="log-out"></i> <span>Logout</span>
-        </button>
-    </div>
-</nav>
+            <ul class="list-unstyled components">
+                <li><a href="#" class="nav-link active" data-module="dashboard"><i data-lucide="layout-dashboard"></i> <span>Dashboard</span></a></li>
+                <li><a href="#" class="nav-link" data-module="students"><i data-lucide="users"></i> <span>Students</span></a></li>
+                <li><a href="#" class="nav-link" data-module="events"><i data-lucide="calendar-days"></i> <span>Events</span></a></li>
+                <li><a href="#" class="nav-link" data-module="attendance"><i data-lucide="user-check"></i> <span>Attendance</span></a></li>
+                <li><a href="#" class="nav-link" data-module="finance"><i data-lucide="wallet"></i> <span>Finance</span></a></li>
+            </ul> 
 
+            <div class="sidebar-footer">
+                <div class="admin-only">
+                    <a href="#" class="nav-link" data-module="settings" style="border-top: 1px solid rgba(255,255,255,0.1); padding-top:15px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; text-decoration: none; color: white;">
+                        <i data-lucide="settings"></i> <span>Settings</span>
+                    </a>
+                </div>
+                <button id="logout-btn" class="logout-btn">
+                    <i data-lucide="log-out"></i> <span>Logout</span>
+                </button>
+            </div>
+        </nav>
 
         <div id="content">
-            <header class="top-nav">
-                <div id="bible-verse" class="verse-text">"Loading daily inspiration..."</div>
+            <header class="top-nav" style="display: flex; align-items: center; justify-content: space-between;">
+                <div class="header-left" style="display: flex; align-items: center; gap: 15px;">
+                    <button id="sidebar-toggle" style="background: none; border: none; cursor: pointer; color: var(--hero-navy); display: flex; align-items: center;">
+                        <i data-lucide="menu"></i>
+                    </button>
+                    <div id="bible-verse" class="verse-text">"Loading daily inspiration..."</div>
+                </div>
                 <div class="header-right">
                     <div class="time-box">
                         <i data-lucide="clock" style="width:14px; margin-right:5px; opacity:0.6;"></i>
@@ -199,13 +212,23 @@
             document.querySelectorAll('.admin-only').forEach(el => el.remove());
         }
 
+        // Sidebar Toggle Implementation
+        const sidebar = document.getElementById('sidebar');
+        const content = document.getElementById('content');
+        const toggleBtn = document.getElementById('sidebar-toggle');
+
+        toggleBtn.addEventListener('click', () => {
+            sidebar.classList.toggle('collapsed');
+            content.classList.toggle('expanded');
+            lucide.createIcons(); // Refresh icons for potential state changes
+        });
+
         // Module Switcher Logic
         const switchModule = (moduleName) => {
             document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
             const activeLink = document.querySelector(`[data-module="${moduleName}"]`);
             if (activeLink) activeLink.classList.add('active');
 
-            // Reset modal root before switching modules
             document.getElementById('modal-root').innerHTML = '';
 
             switch (moduleName) {
@@ -227,12 +250,9 @@
                 default:
                     console.error("Module logic not found");
             }
-
-            // Always refresh icons for dynamic content
             setTimeout(() => lucide.createIcons(), 100);
         };
 
-        // Sidebar Navigation Listeners
         document.querySelectorAll('.nav-link').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -242,7 +262,6 @@
 
         document.getElementById('logout-btn').onclick = logout;
 
-        // Verses & Clock
         async function fetchVerse() {
             try {
                 const res = await fetch('https://labs.bible.org/api/?passage=votd&type=json');
