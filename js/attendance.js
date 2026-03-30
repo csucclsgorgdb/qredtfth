@@ -291,47 +291,66 @@ async function refreshAttendanceTable() {
     if (!eventId) return;
 
     if (unsubscribeAttendance) unsubscribeAttendance();
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:40px;">Refreshing...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:40px;">Loading Participants...</td></tr>`;
 
     try {
         const event = eventDataMap[eventId];
+        
         let studentQ = query(collection(db, "students"), orderBy("fullName"), limit(PAGE_SIZE));
         if (currentPage > 1 && lastVisibleStudent) {
             studentQ = query(collection(db, "students"), orderBy("fullName"), startAfter(lastVisibleStudent), limit(PAGE_SIZE));
         }
+
         const studentDocs = await getDocs(studentQ);
-        if (studentDocs.empty) { tbody.innerHTML = `<tr><td colspan="6">No more students.</td></tr>`; return; }
+        if (studentDocs.empty) { 
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px;">No more students.</td></tr>`; 
+            return; 
+        }
+        
         lastVisibleStudent = studentDocs.docs[studentDocs.docs.length - 1];
         document.getElementById('page-num').innerText = `PAGE ${currentPage}`;
 
         const attQ = query(collection(db, "attendance"), where("eventId", "==", eventId));
+        
         unsubscribeAttendance = onSnapshot(attQ, (snap) => {
             const logMap = {};
             snap.forEach(d => logMap[d.data().studentId] = d.data());
-            tbody.innerHTML = "";
-            let count = 0;
+
+            let html = "";
+            let matchCount = 0;
+
             studentDocs.forEach(sDoc => {
                 const s = sDoc.data();
-                const dept = classifyStudent(s.course);
-                if ((event.targetDept === "ALL" || event.targetDept === dept) && event.targetYears.includes(s.yearLevel.toString())) {
+                const dept = classifyStudent(s.program); // Iniba natin: s.program (hindi s.course)
+
+                // LOGIC FIX: Check natin kung ang "4th Year" ay naglalaman ng target year (hal. "4")
+                const isEligibleDept = (event.targetDept === "ALL" || event.targetDept === dept);
+                const isEligibleYear = event.targetYears.some(yr => s.yearLevel.includes(yr));
+
+                if (isEligibleDept && isEligibleYear) {
                     const log = logMap[sDoc.id];
                     const statusText = log ? log.status : "Absent";
                     const statusColor = log ? (log.status === "Present" ? "#16a34a" : "#ca8a04") : "#ef4444";
-                    tbody.innerHTML += `
+                    
+                    html += `
                         <tr style="border-bottom: 1px solid #f1f5f9;">
                             <td style="padding:15px; font-weight:700;">${s.fullName}</td>
                             <td><span style="font-weight:600;">${sDoc.id}</span><br><small>${dept}</small></td>
-                            <td>${s.course} - Year ${s.yearLevel}</td>
+                            <td>${s.program} - ${s.yearLevel}</td>
                             <td>${log ? log.timeIn : '--:--'}</td>
                             <td>${log ? (log.timeOut || '--:--') : '--:--'}</td>
                             <td><span class="status-badge" style="background:${statusColor}15; color:${statusColor}">${statusText}</span></td>
                         </tr>`;
-                    count++;
+                    matchCount++;
                 }
             });
-            if(count === 0) tbody.innerHTML = `<tr><td colspan="6">No matches on this page.</td></tr>`;
+
+            tbody.innerHTML = matchCount > 0 ? html : `<tr><td colspan="6" style="text-align:center; padding:20px;">No eligible students found on this page.</td></tr>`;
         });
-    } catch (e) { console.error("Table Error:", e); }
+    } catch (e) { 
+        console.error("Table Error:", e);
+        tbody.innerHTML = `<tr><td colspan="6" style="color:red; text-align:center;">Error loading data.</td></tr>`;
+    }
 }
 
 function setupCoreListeners() {
