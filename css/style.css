@@ -15,6 +15,7 @@
     --glass: rgba(255, 255, 255, 0.05);
     --border-glass: rgba(255, 255, 255, 0.1);
     --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* --- 2. GLOBAL RESET --- */
@@ -33,7 +34,7 @@ body {
     overflow-x: hidden;
 }
 
-/* --- 3. SIDEBAR (STAYS LEFT) --- */
+/* --- 3. SIDEBAR --- */
 #sidebar {
     width: var(--sidebar-width);
     background: linear-gradient(180deg, var(--hero-navy) 0%, var(--hero-navy-dark) 100%);
@@ -70,40 +71,7 @@ body {
 
 .logo-icon { color: var(--hero-navy); width: 24px; height: 24px; }
 
-.header-text h3 { font-size: 1.1rem; letter-spacing: 1px; font-weight: 700; }
-.header-text span { font-size: 0.65rem; opacity: 0.6; display: block; text-transform: uppercase; }
-
-/* --- 4. USER PROFILE CARD (GLASS STYLE) --- */
-.user-profile-card {
-    background: var(--glass);
-    backdrop-filter: blur(10px);
-    border: 1px solid var(--border-glass);
-    border-radius: 14px;
-    padding: 14px;
-    margin-bottom: 24px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.user-avatar {
-    width: 36px;
-    height: 36px;
-    background: var(--hero-gold);
-    color: var(--hero-navy);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 800;
-    font-size: 0.9rem;
-}
-
-.user-info .user-name { font-size: 0.85rem; display: block; font-weight: 600; color: white; }
-.user-info .user-status { font-size: 0.7rem; color: var(--hero-gold); font-weight: 700; letter-spacing: 0.5px; }
-
-/* --- 5. NAVIGATION --- */
-.components { list-style: none; flex-grow: 1; }
+/* --- 4. NAVIGATION --- */
 .nav-link {
     display: flex;
     align-items: center;
@@ -112,13 +80,11 @@ body {
     color: #94a3b8;
     text-decoration: none;
     border-radius: 10px;
-    transition: all 0.2s ease;
+    transition: var(--transition);
     font-weight: 500;
     font-size: 0.95rem;
     margin-bottom: 4px;
 }
-
-.nav-link i, [data-lucide] { width: 18px; height: 18px; }
 
 .nav-link:hover {
     background: rgba(255, 255, 255, 0.05);
@@ -132,76 +98,149 @@ body {
     box-shadow: 0 4px 15px var(--hero-gold-glow);
 }
 
-.logout-btn {
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.2);
-    color: #f87171;
-    padding: 12px;
-    border-radius: 10px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    font-weight: 600;
-    transition: 0.3s;
-}
-
-.logout-btn:hover { background: #ef4444; color: white; }
-
-/* --- 6. MAIN CONTENT --- */
+/* --- 5. MAIN CONTENT --- */
 #content {
     margin-left: var(--sidebar-width);
     width: calc(100% - var(--sidebar-width));
     padding: 40px;
+    transition: var(--transition);
 }
 
-.top-nav {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-bottom: 30px;
+/* --- 6. STUDENT MANAGEMENT UI ENHANCEMENTS --- */
+.module-header {
+    background: var(--white);
+    padding: 28px;
+    border-radius: 20px;
+    box-shadow: var(--card-shadow);
     margin-bottom: 30px;
-    border-bottom: 1px solid #e2e8f0;
+    border-left: 6px solid var(--hero-gold);
 }
 
-.verse-text { font-style: italic; color: var(--text-muted); font-size: 0.9rem; max-width: 60%; line-height: 1.4; }
+.search-box input {
+    transition: var(--transition);
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+}
 
-/* --- 7. DASHBOARD CARDS & TABLES --- */
-.stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; }
-
-.stat-card {
+.search-box input:focus {
+    width: 320px;
     background: var(--white);
-    padding: 24px;
-    border-radius: 20px;
-    box-shadow: var(--card-shadow);
-    border: 1px solid #f1f5f9;
-    transition: transform 0.2s ease;
+    border-color: var(--hero-gold);
+    box-shadow: 0 0 0 4px var(--hero-gold-glow);
+    outline: none;
 }
 
-.stat-card:hover { transform: translateY(-4px); }
-.stat-card h3 { color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
-.stat-card p { font-size: 2.2rem; font-weight: 800; color: var(--hero-navy); }
-
-.dashboard-card {
-    background: var(--white);
-    border-radius: 20px;
-    padding: 24px;
-    box-shadow: var(--card-shadow);
-    border: 1px solid #f1f5f9;
+/* Custom Buttons */
+.btn-navy {
+    background: var(--hero-navy);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
-.data-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-.data-table th { text-align: left; padding: 16px; background: #f8fafc; color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; border-bottom: 2px solid #f1f5f9; }
-.data-table td { padding: 16px; border-bottom: 1px solid #f8fafc; font-size: 0.95rem; }
+.btn-navy:hover { background: var(--hero-navy-light); transform: translateY(-1px); }
 
-/* --- 8. SCANNER BOX --- */
-#reader { border: 4px solid var(--hero-navy) !important; border-radius: 20px; overflow: hidden; background: #000; }
+.btn-gold {
+    background: var(--hero-gold);
+    color: var(--hero-navy);
+    border: none;
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
 
-/* --- 9. RESPONSIVE --- */
+.btn-gold:hover { opacity: 0.9; transform: translateY(-1px); }
+
+/* --- 7. DATA TABLE STYLING --- */
+.data-table th {
+    background: #f1f5f9;
+    padding: 14px 18px;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.data-table td {
+    padding: 16px 18px;
+    font-size: 0.9rem;
+    color: var(--text-main);
+}
+
+.data-table tr:hover {
+    background-color: #f8fafc;
+}
+
+.badge {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: inline-block;
+}
+
+/* --- 8. SKELETON LOADING EFFECTS --- */
+.shimmer {
+    height: 20px;
+    background: #f1f5f9;
+    background-image: linear-gradient(to right, #f1f5f9 0%, #e2e8f0 20%, #f1f5f9 40%, #f1f5f9 100%);
+    background-repeat: no-repeat;
+    background-size: 800px 100%;
+    display: inline-block;
+    position: relative;
+    animation: shimmer 1.5s infinite linear;
+    border-radius: 4px;
+    width: 100%;
+}
+
+@keyframes shimmer {
+    0% { background-position: -468px 0; }
+    100% { background-position: 468px 0; }
+}
+
+/* --- 9. PAGINATION --- */
+.nav-btn {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    background: white;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.nav-btn:hover:not(:disabled) {
+    background: var(--hero-gold);
+    border-color: var(--hero-gold);
+}
+
+.nav-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* --- 10. RESPONSIVE --- */
 @media (max-width: 1024px) {
-    #sidebar { width: 80px; padding: 20px 10px; }
-    #sidebar h3, .nav-link span, .sidebar-header span, .user-info { display: none; }
-    #content { margin-left: 80px; width: calc(100% - 80px); }
-    .nav-link { justify-content: center; padding: 15px; }
+    #sidebar { width: 85px; padding: 20px 10px; }
+    #sidebar .header-text, 
+    #sidebar .nav-link span, 
+    #sidebar .user-info { display: none; }
+    #content { margin-left: 85px; width: calc(100% - 85px); padding: 25px; }
+    .nav-link { justify-content: center; }
 }
