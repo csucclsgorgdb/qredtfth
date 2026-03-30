@@ -179,9 +179,99 @@ async function showEventModal() {
 
             return {
                 name,
+/**
+ * MODAL: CREATE EVENT (CONSOLIDATED)
+ * Includes: Duration Type, Dates, Department, and Year Levels
+ */
+async function showEventModal() {
+    const { value: formValues } = await Swal.fire({
+        title: '<span style="color:var(--hero-navy); font-weight:800;">CREATE NEW EVENT</span>',
+        html: `
+            <div style="text-align:left; font-family:inherit;">
+                <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">EVENT NAME</label>
+                <input id="swal-ev-name" class="swal2-input" style="margin:0 0 15px 0; width:100%;" placeholder="Enter event title...">
+
+                <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">DESCRIPTION</label>
+                <textarea id="swal-ev-desc" class="swal2-textarea" style="margin:0 0 15px 0; width:100%; height:60px;" placeholder="Brief details..."></textarea>
+
+                <div style="display:flex; gap:10px; margin-bottom:15px;">
+                    <div style="flex:1">
+                        <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">DURATION TYPE</label>
+                        <select id="swal-ev-duration-type" class="swal2-input" style="margin:0; width:100%;">
+                            <option value="single">One Day Event</option>
+                            <option value="range">Multi-Day Event</option>
+                        </select>
+                    </div>
+                    <div style="flex:1" id="swal-date-container">
+                        <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">DATE</label>
+                        <input type="date" id="swal-ev-start" class="swal2-input" style="margin:0; width:100%;">
+                    </div>
+                </div>
+
+                <div style="margin-bottom:15px;">
+                    <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">TARGET DEPARTMENT</label>
+                    <select id="swal-ev-dept" class="swal2-input" style="margin:0; width:100%;">
+                        <option value="ALL">ALL DEPARTMENTS</option>
+                        <option value="EDUCATION STUDENT">EDUCATION STUDENT</option>
+                        <option value="INDUSTRIAL TECHNOLOGY STUDENT">INDUSTRIAL TECHNOLOGY STUDENT</option>
+                        <option value="OTHER DEPARTMENT">OTHER DEPARTMENT</option>
+                    </select>
+                </div>
+
+                <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:8px;">TARGET YEAR LEVELS</label>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:5px;">
+                    <label style="font-size:13px; cursor:pointer;"><input type="checkbox" class="year-lvl" value="1"> 1st Year</label>
+                    <label style="font-size:13px; cursor:pointer;"><input type="checkbox" class="year-lvl" value="2"> 2nd Year</label>
+                    <label style="font-size:13px; cursor:pointer;"><input type="checkbox" class="year-lvl" value="3"> 3rd Year</label>
+                    <label style="font-size:13px; cursor:pointer;"><input type="checkbox" class="year-lvl" value="4"> 4th Year</label>
+                </div>
+            </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Create Event',
+        confirmButtonColor: '#001a3d',
+        didOpen: () => {
+            // Dynamic switching of date inputs
+            const typeSelect = document.getElementById('swal-ev-duration-type');
+            const dateContainer = document.getElementById('swal-date-container');
+            
+            typeSelect.onchange = (e) => {
+                if(e.target.value === 'range') {
+                    dateContainer.innerHTML = `
+                        <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">FROM - TO</label>
+                        <div style="display:flex; gap:5px;">
+                            <input type="date" id="swal-ev-start" class="swal2-input" style="margin:0; width:100%; font-size:11px; padding:10px;">
+                            <input type="date" id="swal-ev-end" class="swal2-input" style="margin:0; width:100%; font-size:11px; padding:10px;">
+                        </div>
+                    `;
+                } else {
+                    dateContainer.innerHTML = `
+                        <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">DATE</label>
+                        <input type="date" id="swal-ev-start" class="swal2-input" style="margin:0; width:100%;">
+                    `;
+                }
+            };
+        },
+        preConfirm: () => {
+            const name = document.getElementById('swal-ev-name').value.trim();
+            const start = document.getElementById('swal-ev-start').value;
+            const years = Array.from(document.querySelectorAll('.year-lvl:checked')).map(cb => cb.value);
+
+            // Validation
+            if (!name || !start) { 
+                Swal.showValidationMessage('Event Name and Date are required'); 
+                return false; 
+            }
+            if (years.length === 0) { 
+                Swal.showValidationMessage('Select at least one Year Level'); 
+                return false; 
+            }
+
+            return {
+                name,
                 description: document.getElementById('swal-ev-desc').value.trim(),
                 startDate: start,
-                endDate: start, 
+                endDate: document.getElementById('swal-ev-end')?.value || start,
                 targetDept: document.getElementById('swal-ev-dept').value,
                 targetYears: years,
                 status: 'Ongoing',
@@ -190,15 +280,17 @@ async function showEventModal() {
         }
     });
 
+    // Database push
     if (formValues) {
         try {
             await addDoc(collection(db, "events"), formValues);
             Swal.fire({ icon: 'success', title: 'Event Created', showConfirmButton: false, timer: 1500 });
-            loadEvents();
-        } catch (e) { Swal.fire('Error', e.message, 'error'); }
+            loadEvents(); // Refresh table
+        } catch (e) { 
+            Swal.fire('Error', e.message, 'error'); 
+        }
     }
 }
-
 /**
  * ACTIONS: COMPLETE, DELETE & EXPORT
  */
