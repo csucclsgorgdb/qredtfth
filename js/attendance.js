@@ -5,16 +5,15 @@ import {
 
 let html5QrCode;
 let eventDataMap = {};
+let isScannerActive = false;
 
-/**
- * HELPER: I-classify ang departamento base sa kurso
- */
+// --- DYNAMIC CLASSIFICATION ---
 function classifyStudent(course) {
-    if (!course) return "Other Department";
+    if (!course) return "Other";
     const c = course.toUpperCase();
     if (c.includes("BTLED") || c.includes("BTVTED")) return "Education Student";
-    if (c.includes("BSINDTECH")) return "Industrial Technology Student";
-    return "Other Department";
+    if (c.includes("BSINDTECH")) return "Industrial Tech Student";
+    return "Other Dept";
 }
 
 /**
@@ -23,7 +22,7 @@ function classifyStudent(course) {
 export async function initAttendance() {
     const container = document.getElementById('module-container');
     
-    // Kunin ang Ongoing Events
+    // 1. Kunin ang mga Ongoing Events
     const q = query(collection(db, "events"), where("status", "==", "Ongoing"));
     const eventSnap = await getDocs(q);
     
@@ -37,46 +36,40 @@ export async function initAttendance() {
         <div class="module-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
             <div>
                 <h1 class="module-title" style="color:var(--hero-navy); font-weight:800;">Attendance Management</h1>
-                <p class="module-subtitle">Scan Gun, Camera, or Manual Entry Supported.</p>
+                <p class="module-subtitle">Real-time "One-Scan" Time-In/Out System.</p>
             </div>
-            <button id="export-attendance-csv" class="btn-gold"><i data-lucide="download"></i> Export CSV</button>
+            <button id="btn-toggle-camera" class="btn-gold"><i data-lucide="camera"></i> Open Camera</button>
         </div>
 
-        <div class="dashboard-grid">
-            <div class="dashboard-card">
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:15px;">
-                    <div>
-                        <label style="font-size:10px; font-weight:800; color:var(--text-muted);">SELECT EVENT</label>
-                        <select id="attendance-event-id" class="swal2-input" style="margin:5px 0; width:100%; font-size:14px;">
-                            <option value="">-- Choose Event --</option>
-                            ${eventOptions}
-                        </select>
-                    </div>
-                    <div>
-                        <label style="font-size:10px; font-weight:800; color:var(--text-muted);">SELECT DAY</label>
-                        <select id="attendance-day" class="swal2-input" style="margin:5px 0; width:100%; font-size:14px;">
-                            <option value="">-- Select Event First --</option>
-                        </select>
-                    </div>
+        <div class="dashboard-grid" style="grid-template-columns: 0.8fr 1.2fr;">
+            <div class="dashboard-card" style="text-align:center;">
+                <div style="margin-bottom:15px; text-align:left;">
+                    <label style="font-size:10px; font-weight:800; color:var(--text-muted);">SELECT EVENT</label>
+                    <select id="attendance-event-id" class="swal2-input" style="margin:5px 0; width:100%;">
+                        <option value="">-- Choose Event --</option>
+                        ${eventOptions}
+                    </select>
                 </div>
 
                 <div style="margin-bottom:15px;">
-                    <label style="font-size:10px; font-weight:800; color:var(--hero-navy);">SCAN GUN / MANUAL INPUT</label>
-                    <input type="text" id="manual-input" class="swal2-input" placeholder="Ready to scan..." 
-                           style="width:100%; margin:5px 0; text-align:center; font-weight:800; border:2px solid var(--hero-navy);">
+                    <label style="font-size:10px; font-weight:800; color:var(--hero-navy);">SCAN GUN / MANUAL ENTRY</label>
+                    <input type="text" id="manual-input" class="swal2-input attendance-input-active" placeholder="Scan ID or Type here..." 
+                           style="width:100%; margin:5px 0; height:45px;">
                 </div>
 
-                <div id="reader" style="width: 100%; border-radius:15px; overflow:hidden; border:2px solid var(--hero-navy); background:#000;"></div>
-                
-                <div id="scan-feedback" class="dashboard-card" style="margin-top:15px; text-align:center; background:#f8fafc; transition: 0.3s; border:1px solid #e2e8f0;">
+                <div id="scanner-container" style="display:none; width:100%; border-radius:15px; overflow:hidden; border:2px solid var(--hero-navy); background:#000;">
+                    <div id="reader"></div>
+                </div>
+
+                <div id="scan-feedback" class="dashboard-card" style="margin-top:15px; border:1px dashed #cbd5e1; background:#f8fafc; transition: 0.3s;">
                     <h3 id="scan-id" style="color:var(--hero-navy); font-weight:800; margin-bottom:5px;">---</h3>
                     <p id="scan-status" style="margin:5px 0 0 0; font-size:0.9rem;">Waiting for input...</p>
                 </div>
             </div>
 
             <div class="dashboard-card">
-                <h3 style="margin-bottom:15px;"><i data-lucide="list"></i> Eligible Participants</h3>
-                <div class="data-table-container" style="max-height: 500px; overflow-y:auto;">
+                <h3 style="margin-bottom:15px;"><i data-lucide="activity"></i> Eligible Participants</h3>
+                <div class="data-table-container" style="max-height: 480px; overflow-y:auto;">
                     <table class="data-table" style="font-size:11px;">
                         <thead>
                             <tr>
@@ -89,7 +82,7 @@ export async function initAttendance() {
                             </tr>
                         </thead>
                         <tbody id="attendance-tbody">
-                            <tr><td colspan="6" style="text-align:center; padding:20px;">Select an event to view participants.</td></tr>
+                            <tr><td colspan="6" style="text-align:center; padding:20px;">Please select an event to view eligible students.</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -98,75 +91,86 @@ export async function initAttendance() {
     `;
 
     setupEventListeners();
-    startCameraScanner();
     lucide.createIcons();
 }
 
 /**
- * SETUP EVENT LISTENERS (SCAN GUN, DROPDOWNS)
+ * SETUP EVENT LISTENERS (Focus, Keypress, Toggles)
  */
 function setupEventListeners() {
     const eventSelect = document.getElementById('attendance-event-id');
-    const daySelect = document.getElementById('attendance-day');
     const manualInput = document.getElementById('manual-input');
+    const cameraBtn = document.getElementById('btn-toggle-camera');
 
-    // Scan Gun / Enter Key Logic
+    // 1. SMART FOCUS Strategy for Scan Gun
+    document.addEventListener('click', (e) => {
+        // Iwasan ang focus kung kini-click ay select o button
+        if (e.target.closest('select') || e.target.closest('button')) return;
+        manualInput.focus();
+    });
+
+    // 2. Scan Gun / Manual Type and Enter
     manualInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             handleAttendanceInput(manualInput.value.trim());
-            manualInput.value = "";
+            manualInput.value = ""; // Clear for next scan
         }
     });
 
-    // Auto-focus para sa Scan Gun
-    document.addEventListener('click', () => manualInput.focus());
+    // 3. Camera Toggle Logic
+    cameraBtn.onclick = () => toggleCameraScanner(cameraBtn);
 
+    // 4. Event Dropdown Logic
     eventSelect.onchange = (e) => {
         const selectedId = e.target.value;
-        if (!selectedId) {
-            daySelect.innerHTML = '<option value="">-- Select Event First --</option>';
-            return;
-        }
-        const ev = eventDataMap[selectedId];
-        const start = new Date(ev.startDate);
-        const end = new Date(ev.endDate);
-        const diffDays = Math.ceil(Math.abs(end - start) / (1000 * 60 * 60 * 24)) + 1; 
-
-        daySelect.innerHTML = "";
-        for (let i = 1; i <= diffDays; i++) {
-            const dateStr = new Date(start.getTime() + (i-1)*86400000).toLocaleDateString();
-            daySelect.innerHTML += `<option value="Day ${i}">Day ${i} (${dateStr})</option>`;
-        }
-        refreshAttendanceTable(selectedId, daySelect.value);
+        if (!selectedId) return;
+        refreshAttendanceTable(selectedId);
     };
-
-    daySelect.onchange = () => refreshAttendanceTable(eventSelect.value, daySelect.value);
-    document.getElementById('export-attendance-csv').onclick = exportToCSV;
 }
 
 /**
- * CAMERA SCANNER SETUP
+ * CAMERA SCANNER LOGIC (With Delay Fix)
  */
-function startCameraScanner() {
-    html5QrCode = new Html5Qrcode("reader");
-    html5QrCode.start({ facingMode: "environment" }, { fps: 25, qrbox: 250 }, (text) => {
-        html5QrCode.pause();
-        handleAttendanceInput(text);
-        setTimeout(() => html5QrCode.resume(), 2500);
-    }).catch(err => console.error(err));
+function toggleCameraScanner(btn) {
+    const container = document.getElementById('scanner-container');
+    
+    if (isScannerActive) {
+        // STOP
+        if(html5QrCode) html5QrCode.stop();
+        container.style.display = 'none';
+        btn.innerHTML = '<i data-lucide="camera"></i> Open Camera';
+        lucide.createIcons();
+        isScannerActive = false;
+    } else {
+        // START (Inspired by screenshot)
+        container.style.display = 'block';
+        btn.innerHTML = '<i data-lucide="camera-off"></i> Close Camera';
+        btn.style.background = '#ef4444'; // Red background for Close
+        lucide.createIcons();
+        
+        // --- DELAY FIX ---
+        // Bigyan ng 500ms bago simulan ang scanner para tapos na mag-render ang DOM elements
+        setTimeout(() => {
+            html5QrCode = new Html5Qrcode("reader");
+            const config = { fps: 20, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
+            
+            html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
+                html5QrCode.pause(); // anti-double scan
+                handleAttendanceInput(decodedText);
+                setTimeout(() => html5QrCode.resume(), 2500); // resume scanner
+            }).catch(err => console.error(err));
+            
+            isScannerActive = true;
+        }, 500);
+    }
 }
 
 /**
- * CENTRALIZED INPUT HANDLER (The "Brain")
+ * CENTRALIZED INPUT HANDLER
  */
 async function handleAttendanceInput(studentId) {
     const eventId = document.getElementById('attendance-event-id').value;
-    const selectedDay = document.getElementById('attendance-day').value;
-
-    if (!eventId) {
-        Swal.fire('Event Required', 'Pumili muna ng event.', 'warning');
-        return;
-    }
+    if (!eventId || !studentId) return;
 
     const beep = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
     const errorSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2873/2873-preview.mp3');
@@ -178,7 +182,7 @@ async function handleAttendanceInput(studentId) {
         ]);
 
         if (!studentSnap.exists()) {
-            updateUI("Unknown ID", "ID not found in database", "danger");
+            updateUI("ID: " + studentId, "Student not found in database", "danger");
             errorSound.play();
             return;
         }
@@ -186,7 +190,7 @@ async function handleAttendanceInput(studentId) {
         const student = studentSnap.data();
         const event = eventSnap.data();
         
-        // --- STRICT VALIDATION ---
+        // --- STRICT ELIGIBILITY VALIDATION ---
         const studentDept = classifyStudent(student.course);
         const studentYear = student.yearLevel.toString();
 
@@ -199,9 +203,9 @@ async function handleAttendanceInput(studentId) {
             return;
         }
 
-        // --- PROCESS DATABASE UPDATE ---
-        const docId = `${eventId}_${studentId}_${selectedDay.replace(/\s/g, '')}`;
-        const attendanceRef = doc(db, "attendance", docId);
+        // --- PROCESS DB LOGIC ---
+        // Using temporary Single Day logic for consolidation, can be updated with Day logic
+        const attendanceRef = doc(db, "attendance", `${eventId}_${studentId}`);
         const attendSnap = await getDoc(attendanceRef);
         const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -209,18 +213,18 @@ async function handleAttendanceInput(studentId) {
             await setDoc(attendanceRef, {
                 studentId, studentName: student.fullName, courseYear: student.course,
                 classification: studentDept, eventId, eventName: event.name,
-                day: selectedDay, timeIn: nowTime, timeOut: null, status: "In Venue", timestamp: serverTimestamp()
+                timeIn: nowTime, timeOut: null, status: "In Venue", timestamp: serverTimestamp()
             });
-            updateUI(student.fullName, `TIME IN SUCCESS`, "success");
+            updateUI(student.fullName, `TIME IN | ${studentDept}`, "success");
         } else if (attendSnap.data().status === "In Venue") {
             await updateDoc(attendanceRef, { timeOut: nowTime, status: "Present" });
-            updateUI(student.fullName, `TIME OUT SUCCESS`, "info");
+            updateUI(student.fullName, `TIME OUT | ${studentDept}`, "info");
         } else {
-            updateUI(student.fullName, "ALREADY COMPLETED", "warning");
+            updateUI(student.fullName, "Already Completed Attendance", "warning");
         }
 
         beep.play();
-        refreshAttendanceTable(eventId, selectedDay);
+        refreshAttendanceTable(eventId);
 
     } catch (err) {
         console.error(err);
@@ -229,44 +233,41 @@ async function handleAttendanceInput(studentId) {
 }
 
 /**
- * REFRESH TABLE (Filters only eligible participants)
+ * REFRESH TABLE (Filters eligible participants)
  */
-async function refreshAttendanceTable(eventId, day) {
+async function refreshAttendanceTable(eventId) {
     const tbody = document.getElementById('attendance-tbody');
-    if (!eventId || !day) return;
-
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px;">Filtering List...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px;">Syncing Participants...</td></tr>`;
 
     try {
-        const eventSnap = await getDoc(doc(db, "events", eventId));
-        const event = eventSnap.data();
-
-        const [studentsSnap, logsSnap] = await Promise.all([
+        const [eventSnap, studentsSnap, logsSnap] = await Promise.all([
+            getDoc(doc(db, "events", eventId)),
             getDocs(collection(db, "students")),
-            getDocs(query(collection(db, "attendance"), where("eventId", "==", eventId), where("day", "==", day)))
+            getDocs(query(collection(db, "attendance"), where("eventId", "==", eventId)))
         ]);
 
+        const event = eventSnap.data();
         const logs = {};
         logsSnap.forEach(d => logs[d.data().studentId] = d.data());
 
         tbody.innerHTML = "";
         studentsSnap.forEach(sDoc => {
             const student = sDoc.data();
-            const studentDept = classifyStudent(student.course);
-            const studentYear = student.yearLevel.toString();
+            const sDept = classifyStudent(student.course);
+            const sYear = student.yearLevel.toString();
 
-            // Only show if eligible
-            if ((event.targetDept === "ALL" || event.targetDept === studentDept) && event.targetYears.includes(studentYear)) {
+            // Strict filter based on event criteria
+            if ((event.targetDept === "ALL" || event.targetDept === sDept) && event.targetYears.includes(sYear)) {
                 const log = logs[sDoc.id];
                 const row = document.createElement('tr');
                 let statusBadge = log ? (log.status === 'Present' ? 
-                    `<span class="badge" style="background:#22c55e; color:white; padding:3px 8px; border-radius:10px;">PRESENT</span>` : 
-                    `<span class="badge" style="background:#eab308; color:white; padding:3px 8px; border-radius:10px;">IN VENUE</span>`) :
-                    `<span class="badge" style="background:#ef4444; color:white; padding:3px 8px; border-radius:10px;">ABSENT</span>`;
+                    `<span style="background:#22c55e; color:white; padding:3px 8px; border-radius:10px;">PRESENT</span>` : 
+                    `<span style="background:#eab308; color:white; padding:3px 8px; border-radius:10px;">IN VENUE</span>`) :
+                    `<span style="background:#ef4444; color:white; padding:3px 8px; border-radius:10px;">ABSENT</span>`;
 
                 row.innerHTML = `
                     <td><b>${student.fullName}</b></td>
-                    <td>${sDoc.id}<br><small>${studentDept}</small></td>
+                    <td>${sDoc.id}<br><small style="color:var(--hero-gold);">${sDept}</small></td>
                     <td>${student.course} - Yr ${student.yearLevel}</td>
                     <td>${log ? log.timeIn : '--:--'}</td>
                     <td>${log ? (log.timeOut || '--:--') : '--:--'}</td>
@@ -295,7 +296,7 @@ function updateUI(name, status, type) {
     setTimeout(() => {
         if(idEl.innerText === name) {
             idEl.innerText = "---"; statusEl.innerText = "Waiting for input...";
-            box.style.background = "#f8fafc"; box.style.borderColor = "#e2e8f0";
+            box.style.background = "#f8fafc"; box.style.borderColor = "# cbd5e1";
         }
     }, 4000);
 }
@@ -305,18 +306,15 @@ function updateUI(name, status, type) {
  */
 async function exportToCSV() {
     const eventId = document.getElementById('attendance-event-id').value;
-    const day = document.getElementById('attendance-day').value;
-    if(!eventId) return;
-
-    const snap = await getDocs(query(collection(db, "attendance"), where("eventId", "==", eventId), where("day", "==", day)));
-    let csv = "ID,Name,Dept,Course,Day,In,Out,Status\n";
+    if(!eventId) return Swal.fire('Error', 'Choose an event first.', 'error');
+    const snap = await getDocs(query(collection(db, "attendance"), where("eventId", "==", eventId)));
+    let csv = "ID,Name,Dept,Course,In,Out,Status\n";
     snap.forEach(d => {
         const v = d.data();
-        csv += `"${v.studentId}","${v.studentName}","${v.classification}","${v.courseYear}","${v.day}","${v.timeIn}","${v.timeOut || ''}","${v.status}"\n`;
+        csv += `"${v.studentId}","${v.studentName}","${v.classification}","${v.courseYear}","${v.timeIn}","${v.timeOut || ''}","${v.status}"\n`;
     });
-
     const link = document.createElement("a");
     link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    link.download = `Attendance_${eventId}_${day}.csv`;
+    link.download = `Attendance_${eventId}.csv`;
     link.click();
 }
