@@ -362,49 +362,94 @@ async function refreshAttendanceTable() {
                 const isEligibleYear = event.targetYears.some(yr => sYear.includes(yr));
 
                 if (isEligibleDept && isEligibleYear) {
-                    const log = logMap[sDoc.id]; // Document ID ang studentId sa Firestore mo
-                    const statusText = log ? log.status : "Absent";
-                    const statusColor = log ? (log.status === "Present" ? "#16a34a" : "#ca8a04") : "#ef4444";
-                    
-                    html += `
-                        <tr style="border-bottom: 1px solid #f1f5f9;">
-                            <td style="padding:15px; font-weight:700;">${s.fullName}</td>
-                            <td><span style="font-weight:600;">${sDoc.id}</span><br><small>${dept}</small></td>
-                            <td>${studentProgram} - ${sYear}</td>
-                            <td>${log ? log.timeIn : '--:--'}</td>
-                            <td>${log ? (log.timeOut || '--:--') : '--:--'}</td>
-                            <td>
-                                <span class="status-badge" style="background:${statusColor}15; color:${statusColor}; padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;">
-                                    ${statusText}
-                                </span>
-                            </td>
-                        </tr>`;
-                    matchCount++;
-                }
-            });
+async function refreshAttendanceTable() {
+    const eventId = document.getElementById('attendance-event-id').value;
+    const tbody = document.getElementById('attendance-tbody');
+    
+    if (!eventId) return;
 
-            // Kung walang nag-match sa current page, magbigay ng info sa user
-            if (matchCount > 0) {
-                tbody.innerHTML = html;
-            } else {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="6" style="text-align:center; padding:30px;">
-                            <div style="color:#64748b;">No students on <b>Page ${currentPage}</b> match the event criteria.</div>
-                            <div style="font-size:11px; color:#94a3b8; margin-top:5px;">Check Next Page or verify Event Settings (Dept/Year).</div>
+    // 1. Linisin ang lumang listener para iwas sa "double loading" o "flickering"
+    if (unsubscribeAttendance) unsubscribeAttendance();
+    
+    // UI Feedback habang kumukuha ng data
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:40px;">🔍 Syncing with Attendance Database...</td></tr>`;
+
+    try {
+        const event = eventDataMap[eventId];
+        if (!event) {
+            tbody.innerHTML = `<tr><td colspan="6" style="color:orange; text-align:center;">Error: Event data not loaded.</td></tr>`;
+            return;
+        }
+
+        // 2. REAL-TIME ATTENDANCE LISTENER
+        // Babasahin natin DIRECTLY ang attendance collection para sa event na ito.
+        // Ginamitan natin ng 'timestamp desc' para ang huling nag-scan ang laging nasa itaas.
+        const attQ = query(
+            collection(db, "attendance"), 
+            where("eventId", "==", eventId),
+            orderBy("timestamp", "desc")
+        );
+
+        unsubscribeAttendance = onSnapshot(attQ, (snap) => {
+            if (snap.empty) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:30px; color:#64748b;">
+                    No attendees recorded yet. <br> <small>Start scanning student IDs to see them here.</small>
+                </td></tr>`;
+                return;
+            }
+
+            let html = "";
+            snap.forEach(docSnap => {
+                const log = docSnap.data();
+                
+                // Kulay ng status badge
+                const statusColor = log.status === "Present" ? "#16a34a" : (log.status === "In Venue" ? "#ca8a04" : "#ef4444");
+                
+                html += `
+                    <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.3s;">
+                        <td style="padding:15px; font-weight:700; color: #1e293b;">${log.studentName}</td>
+                        <td style="padding:15px;">
+                            <span style="font-weight:600; color: #334155;">${log.studentId}</span><br>
+                            <small style="color: #64748b;">${log.classification || 'Student'}</small>
+                        </td>
+                        <td style="padding:15px; color: #475569;">${log.courseYear || 'N/A'}</td>
+                        <td style="padding:15px; font-family: monospace; font-weight: 600;">${log.timeIn || '--:--'}</td>
+                        <td style="padding:15px; font-family: monospace; font-weight: 600;">${log.timeOut || '--:--'}</td>
+                        <td style="padding:15px;">
+                            <span class="status-badge" style="
+                                background:${statusColor}15; 
+                                color:${statusColor}; 
+                                padding: 6px 12px; 
+                                border-radius: 20px; 
+                                font-size: 11px; 
+                                font-weight: 800;
+                                text-transform: uppercase;
+                                border: 1px solid ${statusColor}30;
+                            ">
+                                ${log.status}
+                            </span>
                         </td>
                     </tr>`;
-            }
+            });
+
+            tbody.innerHTML = html;
         }, (error) => {
-            console.error("Attendance Listener Error:", error);
-            tbody.innerHTML = `<tr><td colspan="6" style="color:red; text-align:center; padding:20px;">Permission Error: Check Firebase Rules.</td></tr>`;
+            // Mismong sa table na natin ilalabas ang error para hindi na kailangan ng console
+            console.error("Firebase Error:", error);
+            tbody.innerHTML = `<tr><td colspan="6" style="color:red; text-align:center; padding:20px;">
+                <b>Firebase Error:</b> ${error.message} <br>
+                <small>Possible missing index or permission issue.</small>
+            </td></tr>`;
         });
 
     } catch (e) { 
         console.error("System Error:", e);
-        tbody.innerHTML = `<tr><td colspan="6" style="color:red; text-align:center; padding:20px;">Critical Error: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="color:red; text-align:center; padding:20px;">
+            <b>System Error:</b> ${e.message}
+        </td></tr>`;
     }
 }
+                    
 function setupCoreListeners() {
     const input = document.getElementById('manual-input');
     const btnSubmit = document.getElementById('btn-manual-submit');
