@@ -51,7 +51,7 @@ export async function initEvents() {
 }
 
 /**
- * LOAD EVENTS WITH DELETE LOCK LOGIC
+ * LOAD EVENTS FROM FIREBASE
  */
 async function loadEvents() {
     const tbody = document.getElementById('event-table-body');
@@ -93,9 +93,9 @@ async function loadEvents() {
             row.innerHTML = `
                 <td>
                     <b>${ev.name}</b><br>
-                    <small style="color:var(--text-muted)">${ev.description?.substring(0, 25)}...</small>
+                    <small style="color:var(--text-muted)">${ev.description?.substring(0, 25) || 'No description'}...</small>
                 </td>
-                <td>${ev.startDate}</td>
+                <td>${ev.startDate}${ev.endDate && ev.endDate !== ev.startDate ? `<br><small>to ${ev.endDate}</small>` : ''}</td>
                 <td>
                     <span style="font-size:11px; font-weight:700; color:var(--hero-navy); display:block;">${ev.targetDept || 'ALL'}</span>
                     <small style="color:var(--hero-gold); font-weight:600;">Year: ${ev.targetYears?.join(', ') || 'ALL'}</small>
@@ -122,66 +122,7 @@ async function loadEvents() {
 }
 
 /**
- * MODAL: CREATE EVENT (DEPT & YEAR LEVEL)
- */
-async function showEventModal() {
-    const { value: formValues } = await Swal.fire({
-        title: '<span style="color:var(--hero-navy); font-weight:800;">CREATE NEW EVENT</span>',
-        html: `
-            <div style="text-align:left; font-family:inherit;">
-                <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">EVENT NAME</label>
-                <input id="swal-ev-name" class="swal2-input" style="margin:0 0 15px 0; width:100%;">
-
-                <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">DESCRIPTION</label>
-                <textarea id="swal-ev-desc" class="swal2-textarea" style="margin:0 0 15px 0; width:100%; height:60px;"></textarea>
-
-                <div style="display:flex; gap:10px; margin-bottom:15px;">
-                    <div style="flex:1">
-                        <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">DEPARTMENT</label>
-                        <select id="swal-ev-dept" class="swal2-input" style="margin:0; width:100%;">
-                            <option value="ALL">ALL DEPARTMENTS</option>
-                            <option value="EDUCATION STUDENT">EDUCATION STUDENT</option>
-                            <option value="INDUSTRIAL TECHNOLOGY STUDENT">INDUSTRIAL TECHNOLOGY STUDENT</option>
-                            <option value="OTHER DEPARTMENT">OTHER DEPARTMENT</option>
-                        </select>
-                    </div>
-                    <div style="flex:1">
-                        <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">EVENT DATE</label>
-                        <input type="date" id="swal-ev-start" class="swal2-input" style="margin:0; width:100%;">
-                    </div>
-                </div>
-
-                <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:8px;">TARGET YEAR LEVELS</label>
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:5px;">
-                    <label style="font-size:13px; cursor:pointer;"><input type="checkbox" class="year-lvl" value="1"> 1st Year</label>
-                    <label style="font-size:13px; cursor:pointer;"><input type="checkbox" class="year-lvl" value="2"> 2nd Year</label>
-                    <label style="font-size:13px; cursor:pointer;"><input type="checkbox" class="year-lvl" value="3"> 3rd Year</label>
-                    <label style="font-size:13px; cursor:pointer;"><input type="checkbox" class="year-lvl" value="4"> 4th Year</label>
-                </div>
-            </div>
-        `,
-        showCancelButton: true,
-        confirmButtonText: 'Create Event',
-        confirmButtonColor: '#001a3d',
-        preConfirm: () => {
-            const name = document.getElementById('swal-ev-name').value.trim();
-            const start = document.getElementById('swal-ev-start').value;
-            const years = Array.from(document.querySelectorAll('.year-lvl:checked')).map(cb => cb.value);
-
-            if (!name || !start) { 
-                Swal.showValidationMessage('Event Name and Date are required'); 
-                return false; 
-            }
-            if (years.length === 0) { 
-                Swal.showValidationMessage('Select at least one Year Level'); 
-                return false; 
-            }
-
-            return {
-                name,
-/**
- * MODAL: CREATE EVENT (CONSOLIDATED)
- * Includes: Duration Type, Dates, Department, and Year Levels
+ * MODAL: CREATE EVENT
  */
 async function showEventModal() {
     const { value: formValues } = await Swal.fire({
@@ -231,7 +172,6 @@ async function showEventModal() {
         confirmButtonText: 'Create Event',
         confirmButtonColor: '#001a3d',
         didOpen: () => {
-            // Dynamic switching of date inputs
             const typeSelect = document.getElementById('swal-ev-duration-type');
             const dateContainer = document.getElementById('swal-date-container');
             
@@ -257,7 +197,6 @@ async function showEventModal() {
             const start = document.getElementById('swal-ev-start').value;
             const years = Array.from(document.querySelectorAll('.year-lvl:checked')).map(cb => cb.value);
 
-            // Validation
             if (!name || !start) { 
                 Swal.showValidationMessage('Event Name and Date are required'); 
                 return false; 
@@ -280,28 +219,26 @@ async function showEventModal() {
         }
     });
 
-    // Database push
     if (formValues) {
         try {
             await addDoc(collection(db, "events"), formValues);
             Swal.fire({ icon: 'success', title: 'Event Created', showConfirmButton: false, timer: 1500 });
-            loadEvents(); // Refresh table
-        } catch (e) { 
-            Swal.fire('Error', e.message, 'error'); 
-        }
+            loadEvents();
+        } catch (e) { Swal.fire('Error', e.message, 'error'); }
     }
 }
+
 /**
- * ACTIONS: COMPLETE, DELETE & EXPORT
+ * ATTACH EVENT ACTIONS (BUTTON BINDING)
  */
 function attachEventActions() {
-    // MARK AS DONE
+    // 1. MARK DONE
     document.querySelectorAll('.btn-complete').forEach(btn => {
         btn.onclick = async (e) => {
             const id = e.currentTarget.dataset.id;
             const res = await Swal.fire({
                 title: 'Mark Event as Done?',
-                text: "This finalized attendance. Deletion will be locked for 7 days.",
+                text: "Attendance will be finalized and deletion locked for 7 days.",
                 icon: 'question',
                 showCancelButton: true,
                 confirmButtonColor: '#22c55e',
@@ -314,7 +251,7 @@ function attachEventActions() {
         };
     });
 
-    // DELETE WITH LOCK LOGIC
+    // 2. DELETE (WITH SECURITY LOCK)
     document.querySelectorAll('.btn-delete-ev').forEach(btn => {
         btn.onclick = async (e) => {
             const id = e.currentTarget.dataset.id;
@@ -325,15 +262,15 @@ function attachEventActions() {
                 Swal.fire({
                     icon: 'info',
                     title: 'Action Locked',
-                    text: `Audit period active. You can delete this in ${daysLeft} day(s).`,
+                    text: `This event is still in the audit period. You can delete it in ${daysLeft} day(s).`,
                     confirmButtonColor: '#001a3d'
                 });
                 return;
             }
 
             const res = await Swal.fire({
-                title: 'Permanently Delete?',
-                text: "All event records will be removed from the database.",
+                title: 'Delete Permanently?',
+                text: "Warning: All records for this event will be gone.",
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#ef4444',
@@ -342,22 +279,30 @@ function attachEventActions() {
 
             if (res.isConfirmed) {
                 await deleteDoc(doc(db, "events", id));
-                Swal.fire('Deleted!', 'Event has been removed.', 'success');
+                Swal.fire('Deleted!', 'Event removed successfully.', 'success');
                 loadEvents();
             }
         };
     });
 
-    // EXPORT
+    // 3. EXPORT
     document.querySelectorAll('.btn-export').forEach(btn => {
         btn.onclick = (e) => exportEventAttendance(e.currentTarget.dataset.id);
     });
 }
 
+/**
+ * EXPORT LOGIC
+ */
 async function exportEventAttendance(eventId) {
-    Swal.fire({ title: 'Preparing Data...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-    // Dito papasok ang Excel/PDF export logic mo soon
+    Swal.fire({ 
+        title: 'Generating Report...', 
+        allowOutsideClick: false, 
+        didOpen: () => Swal.showLoading() 
+    });
+    
+    // Placeholder for Excel/PDF export
     setTimeout(() => {
-        Swal.fire('Ready', 'Export functionality is active.', 'success');
-    }, 1000);
+        Swal.fire('Export Ready', 'The attendance report is ready for download.', 'success');
+    }, 1200);
 }
