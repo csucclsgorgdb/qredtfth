@@ -410,3 +410,11 @@ body.login-page { background: linear-gradient(135deg, var(--hero-navy-dark) 0%, 
     margin-left: 80px; /* Match this to your slim sidebar width in 9800.png */
     width: calc(100% - 80px);
 }
+
+/* Sa dulo ng iyong style.css */
+.attendance-input-active {
+    border: 2px solid var(--hero-navy) !important;
+    background: #fcfcfc !important;
+    text-align: center;
+    font-weight: 800;
+}
