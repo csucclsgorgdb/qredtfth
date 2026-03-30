@@ -291,41 +291,47 @@ async function refreshAttendanceTable() {
     if (!eventId) return;
 
     if (unsubscribeAttendance) unsubscribeAttendance();
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:40px;">Loading Participants...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:40px;">🔍 Searching Students...</td></tr>`;
 
     try {
         const event = eventDataMap[eventId];
         
-        let studentQ = query(collection(db, "students"), orderBy("fullName"), limit(PAGE_SIZE));
-        if (currentPage > 1 && lastVisibleStudent) {
-            studentQ = query(collection(db, "students"), orderBy("fullName"), startAfter(lastVisibleStudent), limit(PAGE_SIZE));
+        // DEBUG: Check muna natin kung may laman ang event data
+        if (!event) {
+            tbody.innerHTML = `<tr><td colspan="6" style="color:orange;">Error: Event data not found.</td></tr>`;
+            return;
         }
 
+        // 1. Fetch Students
+        const studentQ = query(collection(db, "students"), orderBy("fullName"), limit(PAGE_SIZE));
         const studentDocs = await getDocs(studentQ);
-        if (studentDocs.empty) { 
-            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px;">No more students.</td></tr>`; 
-            return; 
-        }
-        
-        lastVisibleStudent = studentDocs.docs[studentDocs.docs.length - 1];
-        document.getElementById('page-num').innerText = `PAGE ${currentPage}`;
 
+        if (studentDocs.empty) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">Empty 'students' collection.</td></tr>`;
+            return;
+        }
+
+        // 2. Real-time Attendance Listener
         const attQ = query(collection(db, "attendance"), where("eventId", "==", eventId));
         
         unsubscribeAttendance = onSnapshot(attQ, (snap) => {
             const logMap = {};
-            snap.forEach(d => logMap[d.data().studentId] = d.data());
+            snap.forEach(d => {
+                const data = d.data();
+                logMap[data.studentId] = data;
+            });
 
             let html = "";
             let matchCount = 0;
 
             studentDocs.forEach(sDoc => {
                 const s = sDoc.data();
-                const dept = classifyStudent(s.program); // Iniba natin: s.program (hindi s.course)
+                const dept = classifyStudent(s.program); // Check if 'program' is correct
 
-                // LOGIC FIX: Check natin kung ang "4th Year" ay naglalaman ng target year (hal. "4")
+                // Check Year Level logic (Safe check)
+                const sYear = s.yearLevel ? s.yearLevel.toString() : "";
                 const isEligibleDept = (event.targetDept === "ALL" || event.targetDept === dept);
-                const isEligibleYear = event.targetYears.some(yr => s.yearLevel.includes(yr));
+                const isEligibleYear = event.targetYears.some(yr => sYear.includes(yr));
 
                 if (isEligibleDept && isEligibleYear) {
                     const log = logMap[sDoc.id];
@@ -336,7 +342,7 @@ async function refreshAttendanceTable() {
                         <tr style="border-bottom: 1px solid #f1f5f9;">
                             <td style="padding:15px; font-weight:700;">${s.fullName}</td>
                             <td><span style="font-weight:600;">${sDoc.id}</span><br><small>${dept}</small></td>
-                            <td>${s.program} - ${s.yearLevel}</td>
+                            <td>${s.program || 'N/A'} - ${s.yearLevel || 'N/A'}</td>
                             <td>${log ? log.timeIn : '--:--'}</td>
                             <td>${log ? (log.timeOut || '--:--') : '--:--'}</td>
                             <td><span class="status-badge" style="background:${statusColor}15; color:${statusColor}">${statusText}</span></td>
@@ -345,11 +351,14 @@ async function refreshAttendanceTable() {
                 }
             });
 
-            tbody.innerHTML = matchCount > 0 ? html : `<tr><td colspan="6" style="text-align:center; padding:20px;">No eligible students found on this page.</td></tr>`;
+            tbody.innerHTML = matchCount > 0 ? html : `<tr><td colspan="6" style="text-align:center; padding:20px;">No students match the criteria for this event.</td></tr>`;
+        }, (error) => {
+            // DITO NATIN MAKIKITA ANG ERROR KAHIT WALANG F12
+            tbody.innerHTML = `<tr><td colspan="6" style="color:red; padding:20px;">Firebase Error: ${error.message}</td></tr>`;
         });
+
     } catch (e) { 
-        console.error("Table Error:", e);
-        tbody.innerHTML = `<tr><td colspan="6" style="color:red; text-align:center;">Error loading data.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="color:red; padding:20px;">System Error: ${e.message}</td></tr>`;
     }
 }
 
