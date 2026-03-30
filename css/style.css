@@ -651,3 +651,41 @@ body.login-page {
 }
 .components::-webkit-scrollbar { width: 4px; }
 .components::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+
+
+/* Ensure the sidebar has a locked, consistent width */
+#sidebar {
+    width: 280px !important; /* Forces the width seen in your dashboard */
+    min-width: 280px;
+    height: 100vh;
+    position: fixed;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.3s ease;
+    overflow-x: hidden; /* Prevents text from leaking out during transitions */
+}
+
+/* Fix the navigation links so text and icons align horizontally */
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: 15px; /* Spacing between icon and text */
+    padding: 12px 20px;
+    width: 100%;
+    text-decoration: none;
+    white-space: nowrap; /* Prevents text from wrapping to a second line */
+}
+
+/* Ensure icons have a fixed size so they don't shrink */
+.nav-link i, .nav-link svg {
+    width: 20px;
+    min-width: 20px;
+    height: 20px;
+}
+
+/* Make sure the text labels are visible */
+.nav-link span {
+    display: inline-block;
+    opacity: 1;
+    transition: opacity 0.3s;
+}
