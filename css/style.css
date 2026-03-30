@@ -454,3 +454,98 @@ body.login-page {
         padding: 30px 20px;
     }
 }
+
+/* --- 11. SWEETALERT2 PREMIUM OVERRIDES --- */
+
+/* Modal Container */
+.swal2-popup {
+    border-radius: 24px !important;
+    padding: 2rem !important;
+    background: var(--white) !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 26, 61, 0.25) !important;
+    border-top: 8px solid var(--hero-gold) !important; /* HERO Brand Accent */
+}
+
+/* Title Styling */
+.swal2-title {
+    color: var(--hero-navy) !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.5px !important;
+    font-size: 1.6rem !important;
+    text-transform: uppercase !important;
+    margin-bottom: 20px !important;
+}
+
+/* Input Fields inside Modal */
+.swal2-input, .swal2-select, .swal2-textarea {
+    border-radius: 12px !important;
+    border: 1.5px solid var(--border-color) !important;
+    font-size: 0.95rem !important;
+    height: 48px !important;
+    background: #f8fafc !important;
+    transition: var(--transition) !important;
+    box-shadow: none !important;
+    color: var(--hero-navy) !important;
+}
+
+.swal2-input:focus {
+    border-color: var(--hero-gold) !important;
+    background: white !important;
+    box-shadow: 0 0 0 4px var(--hero-gold-glow) !important;
+}
+
+/* Label Styling (For your custom HTML in students.js) */
+.swal2-html-container label {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    color: var(--text-muted) !important;
+    display: block !important;
+    margin-bottom: 5px !important;
+    margin-top: 10px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+}
+
+/* Confirm Button (Navy) */
+.swal2-confirm {
+    background-color: var(--hero-navy) !important;
+    color: white !important;
+    border-radius: 12px !important;
+    font-weight: 700 !important;
+    padding: 12px 30px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1px !important;
+    transition: var(--transition) !important;
+}
+
+.swal2-confirm:hover {
+    background-color: var(--hero-navy-light) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 15px rgba(0, 26, 61, 0.2) !important;
+}
+
+/* Cancel Button */
+.swal2-cancel {
+    background-color: transparent !important;
+    color: var(--text-muted) !important;
+    font-weight: 600 !important;
+    border-radius: 12px !important;
+    transition: var(--transition) !important;
+}
+
+.swal2-cancel:hover {
+    background-color: #f1f5f9 !important;
+    color: var(--hero-navy) !important;
+}
+
+/* Icon Colors (Success/Error/Warning) */
+.swal2-icon.swal2-success {
+    border-color: var(--hero-gold) !important;
+}
+.swal2-icon.swal2-success [class^='swal2-success-line'] {
+    background-color: var(--hero-gold) !important;
+}
+.swal2-icon.swal2-success .swal2-success-ring {
+    border: 4px solid rgba(255, 204, 0, 0.3) !important;
+}
+
