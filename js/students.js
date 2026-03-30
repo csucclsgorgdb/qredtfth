@@ -8,6 +8,17 @@ const PAGE_SIZE = 25;
 let currentSearch = "";
 
 /**
+ * SECURITY: SANITIZATION
+ * Prevents script insertion/XSS by converting HTML tags to plain text.
+ */
+function sanitize(str) {
+    if (!str) return "";
+    const temp = document.createElement('div');
+    temp.textContent = str;
+    return temp.innerHTML;
+}
+
+/**
  * MODULE INITIALIZATION
  */
 export async function initStudents() {
@@ -55,7 +66,6 @@ export async function initStudents() {
         </div>
     `;
 
-    // Re-binding Listeners
     document.getElementById('btn-import-trigger').onclick = () => document.getElementById('file-import').click();
     document.getElementById('file-import').onchange = handleFileUpload;
     document.getElementById('btn-add-manual').onclick = () => showStudentModal();
@@ -71,7 +81,7 @@ export async function initStudents() {
 }
 
 /**
- * MODAL: PROFESSIONAL ADD/EDIT (SweetAlert2)
+ * MODAL: ADD/EDIT
  */
 async function showStudentModal(studentId = null) {
     let s = { studentId: '', fullName: '', college: '', program: '', yearLevel: '' };
@@ -86,37 +96,33 @@ async function showStudentModal(studentId = null) {
         html: `
             <div style="text-align:left; font-family: inherit;">
                 <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">ID NUMBER</label>
-                <input id="swal-id" class="swal2-input" style="margin:0 0 15px 0; width:100%;" placeholder="e.g. 2024-0001" value="${s.studentId}" ${studentId ? 'readonly' : ''}>
+                <input id="swal-id" class="swal2-input" style="margin:0 0 15px 0; width:100%;" placeholder="e.g. 2024-0001" value="${sanitize(s.studentId)}" ${studentId ? 'readonly' : ''}>
                 
                 <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">FULL NAME</label>
-                <input id="swal-name" class="swal2-input" style="margin:0 0 15px 0; width:100%; text-transform:uppercase;" placeholder="SURNAME, FIRSTNAME M." value="${s.fullName}">
+                <input id="swal-name" class="swal2-input" style="margin:0 0 15px 0; width:100%; text-transform:uppercase;" placeholder="SURNAME, FIRSTNAME M." value="${sanitize(s.fullName)}">
                 
                 <div style="display:flex; gap:10px; margin-bottom:15px;">
                     <div style="flex:1">
                         <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">COLLEGE</label>
-                        <input id="swal-college" class="swal2-input" style="margin:0; width:100%;" placeholder="CITTE" value="${s.college}">
+                        <input id="swal-college" class="swal2-input" style="margin:0; width:100%;" placeholder="CITTE" value="${sanitize(s.college)}">
                     </div>
                     <div style="flex:1">
                         <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">YEAR LEVEL</label>
-                        <input id="swal-year" class="swal2-input" style="margin:0; width:100%;" placeholder="1st Year" value="${s.yearLevel}">
+                        <input id="swal-year" class="swal2-input" style="margin:0; width:100%;" placeholder="1st Year" value="${sanitize(s.yearLevel)}">
                     </div>
                 </div>
 
                 <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">COURSE / PROGRAM</label>
-                <input id="swal-program" class="swal2-input" style="margin:0; width:100%;" placeholder="BTLED / BTVTEd" value="${s.program}">
+                <input id="swal-program" class="swal2-input" style="margin:0; width:100%;" placeholder="BTLED / BTVTEd" value="${sanitize(s.program)}">
             </div>
         `,
         showCancelButton: true,
         confirmButtonText: 'Save Record',
         confirmButtonColor: '#0a192f',
-        cancelButtonColor: '#cbd5e1',
         preConfirm: () => {
-            const id = document.getElementById('swal-id').value.trim();
-            const name = document.getElementById('swal-name').value.trim();
-            if (!id || !name) return Swal.showValidationMessage('ID and Name are required');
             return {
-                studentId: id,
-                fullName: name.toUpperCase(),
+                studentId: document.getElementById('swal-id').value.trim(),
+                fullName: document.getElementById('swal-name').value.trim().toUpperCase(),
                 college: document.getElementById('swal-college').value.trim().toUpperCase(),
                 program: document.getElementById('swal-program').value.trim().toUpperCase(),
                 yearLevel: document.getElementById('swal-year').value.trim()
@@ -124,13 +130,11 @@ async function showStudentModal(studentId = null) {
         }
     });
 
-    if (formValues) {
+    if (formValues && formValues.studentId && formValues.fullName) {
         try {
-            if (studentId) {
-                await updateDoc(doc(db, "students", studentId), formValues);
-            } else {
+            await updateDoc(doc(db, "students", formValues.studentId), formValues).catch(async () => {
                 await writeBatch(db).set(doc(db, "students", formValues.studentId), { ...formValues, balance: 0 }).commit();
-            }
+            });
             Swal.fire({ icon: 'success', title: 'Saved!', timer: 1500, showConfirmButton: false });
             loadStudents();
         } catch (e) { Swal.fire('Error', e.message, 'error'); }
@@ -162,11 +166,11 @@ async function loadStudents(isAppend = false) {
             const s = docSnap.data();
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td><b>${s.studentId}</b></td>
-                <td style="text-transform: uppercase;">${s.fullName}</td>
-                <td>${s.college || '---'}</td>
-                <td><span class="badge" style="background:#f1f5f9; color:#0a192f; border:1px solid #e2e8f0;">${s.program || '---'}</span></td>
-                <td>${s.yearLevel || '---'}</td>
+                <td><b>${sanitize(s.studentId)}</b></td>
+                <td style="text-transform: uppercase;">${sanitize(s.fullName)}</td>
+                <td>${sanitize(s.college)}</td>
+                <td><span class="badge" style="background:#f1f5f9; color:#0a192f; border:1px solid #e2e8f0;">${sanitize(s.program)}</span></td>
+                <td>${sanitize(s.yearLevel)}</td>
                 <td style="text-align:right">
                     <button class="btn-edit" data-id="${docSnap.id}" style="border:none; background:none; color:#0a192f; cursor:pointer;"><i data-lucide="edit-3" style="width:18px"></i></button>
                     <button class="btn-delete" data-id="${docSnap.id}" style="border:none; background:none; color:#ef4444; cursor:pointer; margin-left:12px;"><i data-lucide="trash-2" style="width:18px"></i></button>
@@ -208,7 +212,7 @@ function attachActionListeners() {
 }
 
 /**
- * EXCEL IMPORT
+ * EXCEL IMPORT: UNSTRICT & SECURE
  */
 async function handleFileUpload(event) {
     const file = event.target.files[0];
@@ -225,22 +229,26 @@ async function handleFileUpload(event) {
             const batch = writeBatch(db);
             
             jsonData.forEach(row => {
-                const id = (row.Id || row['Student ID'] || row.ID || "").toString().trim();
-                const name = (row['Student Name'] || row.Name || row['Full Name'] || "").toString().trim();
+                // Dynamic header detection
+                const id = String(row['ID NUMBER'] || row.Id || row.ID || row['Student ID'] || "").trim();
+                const name = String(row['STUDENT NAME'] || row['Student Name'] || row.Name || row['Full Name'] || "").trim();
+                const prog = String(row['COURSE/PROGRAM'] || row['Course/Program'] || row.Course || row.Program || "").trim();
+
                 if (id && name) {
                     batch.set(doc(db, "students", id), {
                         studentId: id,
                         fullName: name.toUpperCase(),
-                        college: (row.College || "").toString().trim().toUpperCase(),
-                        program: (row['Course/Program'] || row.Course || row.Program || "").toString().trim().toUpperCase(),
-                        yearLevel: (row['Year Level'] || row.Year || "").toString().trim(),
-                        balance: 0
+                        college: String(row.COLLEGE || row.College || "").trim().toUpperCase(),
+                        program: prog.toUpperCase(),
+                        yearLevel: String(row.YEAR || row['Year Level'] || row.Year || "").trim(),
+                        balance: 0,
+                        lastUpdated: new Date().toISOString()
                     });
                 }
             });
             await batch.commit();
-            Swal.fire('Import Success', 'Database updated.', 'success');
-            initStudents();
+            Swal.fire('Import Success', 'Data has been synced.', 'success');
+            loadStudents();
         } catch (err) { Swal.fire('Error', err.message, 'error'); }
     };
     reader.readAsArrayBuffer(file);
