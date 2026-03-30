@@ -288,37 +288,59 @@ function updateUIFeedback(name, status, type) {
 async function refreshAttendanceTable() {
     const eventId = document.getElementById('attendance-event-id').value;
     const tbody = document.getElementById('attendance-tbody');
+    const pageDisplay = document.getElementById('page-num'); // Siguraduhing may element na ganito ang ID
+
     if (!eventId) return;
 
+    // Linisin ang lumang listener para iwas memory leak at double loading
     if (unsubscribeAttendance) unsubscribeAttendance();
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:40px;">🔍 Searching Students...</td></tr>`;
+    
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:40px;">🔍 Fetching Participants (Page ${currentPage})...</td></tr>`;
 
     try {
         const event = eventDataMap[eventId];
-        
-        // DEBUG: Check muna natin kung may laman ang event data
         if (!event) {
-            tbody.innerHTML = `<tr><td colspan="6" style="color:orange;">Error: Event data not found.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" style="color:orange; text-align:center;">Error: Event settings not loaded.</td></tr>`;
             return;
         }
 
-        // 1. Fetch Students
-        const studentQ = query(collection(db, "students"), orderBy("fullName"), limit(PAGE_SIZE));
+        // 1. Pag-setup ng Student Query para sa Pagination
+        // Naka-order by fullName para consistent ang listahan sa 10,000 students
+        let studentQ = query(
+            collection(db, "students"), 
+            orderBy("fullName"), 
+            limit(PAGE_SIZE)
+        );
+
+        // Kung hindi ito Page 1, gagamit tayo ng 'startAfter' gamit ang huling student doc
+        if (currentPage > 1 && lastVisibleStudent) {
+            studentQ = query(
+                collection(db, "students"), 
+                orderBy("fullName"), 
+                startAfter(lastVisibleStudent), 
+                limit(PAGE_SIZE)
+            );
+        }
+
         const studentDocs = await getDocs(studentQ);
 
         if (studentDocs.empty) {
-            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">Empty 'students' collection.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px;">No more students to display.</td></tr>`;
             return;
         }
 
+        // I-update ang reference para sa susunod na page
+        lastVisibleStudent = studentDocs.docs[studentDocs.docs.length - 1];
+        if (pageDisplay) pageDisplay.innerText = `PAGE ${currentPage}`;
+
         // 2. Real-time Attendance Listener
+        // Nakatutok lang ito sa attendance logs para sa SPECIFIC event na ito
         const attQ = query(collection(db, "attendance"), where("eventId", "==", eventId));
         
         unsubscribeAttendance = onSnapshot(attQ, (snap) => {
             const logMap = {};
             snap.forEach(d => {
-                const data = d.data();
-                logMap[data.studentId] = data;
+                logMap[d.data().studentId] = d.data();
             });
 
             let html = "";
@@ -326,15 +348,21 @@ async function refreshAttendanceTable() {
 
             studentDocs.forEach(sDoc => {
                 const s = sDoc.data();
-                const dept = classifyStudent(s.program); // Check if 'program' is correct
+                
+                // --- SMART FILTERING LOGIC ---
+                // Kinukuha natin ang 'program' base sa screenshot ng DB mo
+                const studentProgram = (s.program || "").toUpperCase();
+                const dept = classifyStudent(studentProgram); 
+                const sYear = (s.yearLevel || "").toString();
 
-                // Check Year Level logic (Safe check)
-                const sYear = s.yearLevel ? s.yearLevel.toString() : "";
+                // Check eligibility base sa Event Settings
                 const isEligibleDept = (event.targetDept === "ALL" || event.targetDept === dept);
+                
+                // Year Check: Ang '4' ay mag-ma-match sa '4th Year' gamit ang includes
                 const isEligibleYear = event.targetYears.some(yr => sYear.includes(yr));
 
                 if (isEligibleDept && isEligibleYear) {
-                    const log = logMap[sDoc.id];
+                    const log = logMap[sDoc.id]; // Document ID ang studentId sa Firestore mo
                     const statusText = log ? log.status : "Absent";
                     const statusColor = log ? (log.status === "Present" ? "#16a34a" : "#ca8a04") : "#ef4444";
                     
@@ -342,26 +370,41 @@ async function refreshAttendanceTable() {
                         <tr style="border-bottom: 1px solid #f1f5f9;">
                             <td style="padding:15px; font-weight:700;">${s.fullName}</td>
                             <td><span style="font-weight:600;">${sDoc.id}</span><br><small>${dept}</small></td>
-                            <td>${s.program || 'N/A'} - ${s.yearLevel || 'N/A'}</td>
+                            <td>${studentProgram} - ${sYear}</td>
                             <td>${log ? log.timeIn : '--:--'}</td>
                             <td>${log ? (log.timeOut || '--:--') : '--:--'}</td>
-                            <td><span class="status-badge" style="background:${statusColor}15; color:${statusColor}">${statusText}</span></td>
+                            <td>
+                                <span class="status-badge" style="background:${statusColor}15; color:${statusColor}; padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;">
+                                    ${statusText}
+                                </span>
+                            </td>
                         </tr>`;
                     matchCount++;
                 }
             });
 
-            tbody.innerHTML = matchCount > 0 ? html : `<tr><td colspan="6" style="text-align:center; padding:20px;">No students match the criteria for this event.</td></tr>`;
+            // Kung walang nag-match sa current page, magbigay ng info sa user
+            if (matchCount > 0) {
+                tbody.innerHTML = html;
+            } else {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" style="text-align:center; padding:30px;">
+                            <div style="color:#64748b;">No students on <b>Page ${currentPage}</b> match the event criteria.</div>
+                            <div style="font-size:11px; color:#94a3b8; margin-top:5px;">Check Next Page or verify Event Settings (Dept/Year).</div>
+                        </td>
+                    </tr>`;
+            }
         }, (error) => {
-            // DITO NATIN MAKIKITA ANG ERROR KAHIT WALANG F12
-            tbody.innerHTML = `<tr><td colspan="6" style="color:red; padding:20px;">Firebase Error: ${error.message}</td></tr>`;
+            console.error("Attendance Listener Error:", error);
+            tbody.innerHTML = `<tr><td colspan="6" style="color:red; text-align:center; padding:20px;">Permission Error: Check Firebase Rules.</td></tr>`;
         });
 
     } catch (e) { 
-        tbody.innerHTML = `<tr><td colspan="6" style="color:red; padding:20px;">System Error: ${e.message}</td></tr>`;
+        console.error("System Error:", e);
+        tbody.innerHTML = `<tr><td colspan="6" style="color:red; text-align:center; padding:20px;">Critical Error: ${e.message}</td></tr>`;
     }
 }
-
 function setupCoreListeners() {
     const input = document.getElementById('manual-input');
     const btnSubmit = document.getElementById('btn-manual-submit');
