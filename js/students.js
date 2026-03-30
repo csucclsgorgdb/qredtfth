@@ -19,7 +19,7 @@ function getClassification(program) {
     const p = program.toUpperCase();
     if (p.includes("BTLED") || p.includes("BTVTED")) {
         return "EDUCATION STUDENT";
-    } else if (p.includes("BSINDTECH")) {
+    } else if (p.includes("BSINDUSTECH")) {
         return "INDUSTRIAL TECHNOLOGY STUDENT";
     }
     return "OTHER DEPARTMENT";
