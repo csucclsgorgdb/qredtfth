@@ -150,7 +150,7 @@ async function loadOngoingEvents() {
 }
 
 /**
- * CAMERA LIFECYCLE: CONSOLIDATED WITH DEBUG ALERTS
+ * CAMERA LIFECYCLE: CLEAN VERSION (No more Debug Alerts)
  */
 async function toggleCameraScanner(btn) {
     const readerDiv = document.getElementById('reader');
@@ -173,18 +173,16 @@ async function toggleCameraScanner(btn) {
         btnSpan.innerText = "Open Camera";
         isScannerActive = false;
     } else {
-        alert("DEBUG: Starting Scanner..."); // ALERT 1
+        // Diretsong initialize na tayo, wala nang abalang alert
         btnSpan.innerText = "Initializing...";
         readerDiv.style.display = 'block';
         ph.style.display = 'none';
 
         try {
-            alert("DEBUG: Checking Hardware..."); // ALERT 2
             const devices = await Html5Qrcode.getCameras();
             if (!devices || devices.length === 0) throw new Error("No camera detected.");
 
-            alert(`DEBUG: Found ${devices.length} cams. Starting Stream...`); // ALERT 3
-            html5QrCode = new Html5Qrcode("reader", { verbose: true });
+            html5QrCode = new Html5Qrcode("reader", { verbose: false }); // Ginawa nating false ang verbose para clean console
             
             const qrConfig = { fps: 20, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
 
@@ -198,21 +196,19 @@ async function toggleCameraScanner(btn) {
                 }
             );
 
-            alert("DEBUG: Camera Live!"); // ALERT 4
             btn.style.background = "#ef4444"; 
             btnSpan.innerText = "Close Camera";
             isScannerActive = true;
         } catch (err) {
-            alert("DEBUG ERROR: " + err.message);
+            console.error("Scanner Error:", err.message);
             isScannerActive = false;
             readerDiv.style.display = 'none';
             ph.style.display = 'flex';
             btnSpan.innerText = "Open Camera";
-            Swal.fire("Scanner Error", err.message, "error");
+            Swal.fire("Scanner Error", "Cannot access Camera. Please check permission first.", "error");
         }
     }
 }
-
 async function handleAttendanceInput(id) {
     const eventId = document.getElementById('attendance-event-id').value;
     if (!eventId) {
