@@ -35,7 +35,6 @@ function classifyStudent(course) {
 export async function initAttendance() {
     const container = document.getElementById('module-container');
     
-    // UI Skeleton - Navy Blue & Golden Yellow Branding
     container.innerHTML = `
         <style>
             :root { --hero-navy: #000080; --hero-gold: #FFD700; }
@@ -106,7 +105,6 @@ export async function initAttendance() {
                         </div>
                     </div>
                 </div>
-                
                 <div style="overflow-x:auto; max-height: 550px;">
                     <table class="data-table" style="width:100%; border-collapse: collapse; font-size: 12px;">
                         <thead>
@@ -133,20 +131,15 @@ export async function initAttendance() {
     lucide.createIcons();
 }
 
-/**
- * CORE LOGIC: FETCH EVENTS
- */
 async function loadOngoingEvents() {
     const sel = document.getElementById('attendance-event-id');
     try {
         const q = query(collection(db, "events"), where("status", "==", "Ongoing"));
         const snap = await getDocs(q);
-        
         if(snap.empty) {
             sel.innerHTML = `<option value="">No Ongoing Events</option>`;
             return;
         }
-
         let options = `<option value="">-- Choose Event --</option>`;
         snap.forEach(doc => {
             eventDataMap[doc.id] = doc.data();
@@ -157,14 +150,13 @@ async function loadOngoingEvents() {
 }
 
 /**
- * CAMERA LIFECYCLE: THE 500-LINE FIX
+ * CAMERA LIFECYCLE: CONSOLIDATED WITH DEBUG ALERTS
  */
 async function toggleCameraScanner(btn) {
     const readerDiv = document.getElementById('reader');
     const ph = document.getElementById('camera-placeholder');
     const btnSpan = btn.querySelector('span');
 
-    // IF ACTIVE: SHUTDOWN EVERYTHING
     if (isScannerActive) {
         btnSpan.innerText = "Closing...";
         if (html5QrCode) {
@@ -175,75 +167,58 @@ async function toggleCameraScanner(btn) {
             html5QrCode = null;
         }
         readerDiv.style.display = 'none';
-        readerDiv.innerHTML = ""; // Hard reset
+        readerDiv.innerHTML = ""; 
         ph.style.display = 'flex';
         btn.style.background = "var(--hero-navy)";
         btnSpan.innerText = "Open Camera";
         isScannerActive = false;
-    } 
-    // IF INACTIVE: INITIALIZE WITH ANDROID PRE-CHECK
-    else {
+    } else {
+        alert("DEBUG: Starting Scanner..."); // ALERT 1
         btnSpan.innerText = "Initializing...";
         readerDiv.style.display = 'block';
         ph.style.display = 'none';
 
         try {
-            // Check for camera hardware availability first
+            alert("DEBUG: Checking Hardware..."); // ALERT 2
             const devices = await Html5Qrcode.getCameras();
-            if (!devices || devices.length === 0) {
-                throw new Error("No camera hardware detected.");
-            }
+            if (!devices || devices.length === 0) throw new Error("No camera detected.");
 
-            html5QrCode = new Html5Qrcode("reader", { verbose: false });
+            alert(`DEBUG: Found ${devices.length} cams. Starting Stream...`); // ALERT 3
+            html5QrCode = new Html5Qrcode("reader", { verbose: true });
             
-            const qrConfig = {
-                fps: 25,
-                qrbox: { width: 250, height: 250 },
-                aspectRatio: 1.0
-            };
+            const qrConfig = { fps: 20, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
 
             await html5QrCode.start(
                 { facingMode: "environment" }, 
                 qrConfig,
                 (decodedText) => {
                     handleAttendanceInput(decodedText);
-                    // Pause for UX stability on mobile
                     html5QrCode.pause(true);
                     setTimeout(() => { if(html5QrCode) html5QrCode.resume(); }, 3000);
                 }
             );
 
-            btn.style.background = "#ef4444"; // Red for "Close"
+            alert("DEBUG: Camera Live!"); // ALERT 4
+            btn.style.background = "#ef4444"; 
             btnSpan.innerText = "Close Camera";
             isScannerActive = true;
         } catch (err) {
-            console.error("Critical Scanner Error:", err);
+            alert("DEBUG ERROR: " + err.message);
             isScannerActive = false;
             readerDiv.style.display = 'none';
             ph.style.display = 'flex';
             btnSpan.innerText = "Open Camera";
-            
-            Swal.fire({
-                title: "Scanner Locked",
-                text: "Android blocked the camera. Please ensure no other app is using it and refresh.",
-                icon: "error",
-                background: "#fff",
-                confirmButtonColor: "#000080"
-            });
+            Swal.fire("Scanner Error", err.message, "error");
         }
     }
 }
 
-/**
- * ATTENDANCE HANDLER: VALIDATION & FIRESTORE
- */
 async function handleAttendanceInput(id) {
     const eventId = document.getElementById('attendance-event-id').value;
     if (!eventId) {
         Swal.fire("Attention", "Select an ongoing event first.", "warning");
         return;
     }
-
     const cleanId = id.trim();
     if (!cleanId) return;
 
@@ -254,235 +229,140 @@ async function handleAttendanceInput(id) {
             audioError.play();
             return;
         }
-
         const student = studentDoc.data();
         const event = eventDataMap[eventId];
         const studentDept = classifyStudent(student.course);
 
-        // Eligibility Check (Consolidated logic)
         const isEligibleDept = (event.targetDept === "ALL" || event.targetDept === studentDept);
         const isEligibleYear = event.targetYears.includes(student.yearLevel.toString());
 
         if (!isEligibleDept || !isEligibleYear) {
-            updateUIFeedback(student.fullName, "NOT ELIGIBLE FOR THIS EVENT", "danger");
+            updateUIFeedback(student.fullName, "NOT ELIGIBLE", "danger");
             audioError.play();
             return;
         }
 
-        // Attendance Record Transaction
         const attendRef = doc(db, "attendance", `${eventId}_${cleanId}`);
         const attendSnap = await getDoc(attendRef);
         const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
 
         if (!attendSnap.exists()) {
-            // TIME IN
             await setDoc(attendRef, {
-                studentId: cleanId,
-                studentName: student.fullName,
-                courseYear: `${student.course} - ${student.yearLevel}`,
-                classification: studentDept,
-                eventId: eventId,
-                eventName: event.name,
-                timeIn: timeNow,
-                timeOut: null,
-                status: "In Venue",
-                timestamp: serverTimestamp()
+                studentId: cleanId, studentName: student.fullName, courseYear: `${student.course} - ${student.yearLevel}`,
+                classification: studentDept, eventId: eventId, eventName: event.name, timeIn: timeNow,
+                timeOut: null, status: "In Venue", timestamp: serverTimestamp()
             });
             updateUIFeedback(student.fullName, "TIME IN SUCCESSFUL", "success");
             audioSuccess.play();
         } else {
             const data = attendSnap.data();
             if (data.status === "In Venue") {
-                // TIME OUT
-                await updateDoc(attendRef, {
-                    timeOut: timeNow,
-                    status: "Present"
-                });
+                await updateDoc(attendRef, { timeOut: timeNow, status: "Present" });
                 updateUIFeedback(student.fullName, "TIME OUT SUCCESSFUL", "info");
                 audioSuccess.play();
             } else {
                 updateUIFeedback(student.fullName, "ALREADY COMPLETED", "warning");
             }
         }
-    } catch (err) {
-        console.error("Firestore Error:", err);
-    }
+    } catch (err) { console.error("Firestore Error:", err); }
 }
 
-/**
- * UI FEEDBACK HELPER
- */
 function updateUIFeedback(name, status, type) {
     const box = document.getElementById('scan-feedback');
     const idH = document.getElementById('scan-id');
     const stP = document.getElementById('scan-status');
-
     const colors = {
         success: { bg: '#dcfce7', text: '#16a34a', border: '#bbf7d0' },
         info: { bg: '#dbeafe', text: '#2563eb', border: '#bfdbfe' },
         warning: { bg: '#fef9c3', text: '#ca8a04', border: '#fef08a' },
         danger: { bg: '#fee2e2', text: '#dc2626', border: '#fecaca' }
     };
-
     const theme = colors[type];
-    box.style.background = theme.bg;
-    box.style.borderColor = theme.border;
-    idH.innerText = name;
-    idH.style.color = theme.text;
-    stP.innerText = status;
-    stP.style.color = theme.text;
+    box.style.background = theme.bg; box.style.borderColor = theme.border;
+    idH.innerText = name; idH.style.color = theme.text;
+    stP.innerText = status; stP.style.color = theme.text;
 
-    // Reset after 4 seconds
     setTimeout(() => {
-        box.style.background = "white";
-        box.style.borderColor = "#f1f5f9";
-        idH.innerText = "---";
-        idH.style.color = "var(--hero-navy)";
-        stP.innerText = "Waiting for scan...";
-        stP.style.color = "#94a3b8";
+        box.style.background = "white"; box.style.borderColor = "#f1f5f9";
+        idH.innerText = "---"; idH.style.color = "var(--hero-navy)";
+        stP.innerText = "Waiting for scan..."; stP.style.color = "#94a3b8";
     }, 4000);
 }
 
-/**
- * LIVE DATA TABLE: REFRESH & LISTEN
- */
 async function refreshAttendanceTable() {
     const eventId = document.getElementById('attendance-event-id').value;
     const tbody = document.getElementById('attendance-tbody');
     if (!eventId) return;
 
     if (unsubscribeAttendance) unsubscribeAttendance();
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:40px;">Refreshing list...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:40px;">Refreshing...</td></tr>`;
 
     try {
         const event = eventDataMap[eventId];
-        
-        // 1. Get Base Students Query (with Pagination)
         let studentQ = query(collection(db, "students"), orderBy("fullName"), limit(PAGE_SIZE));
         if (currentPage > 1 && lastVisibleStudent) {
             studentQ = query(collection(db, "students"), orderBy("fullName"), startAfter(lastVisibleStudent), limit(PAGE_SIZE));
         }
-
         const studentDocs = await getDocs(studentQ);
-        if (studentDocs.empty) {
-            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:40px;">No more students.</td></tr>`;
-            return;
-        }
-
+        if (studentDocs.empty) { tbody.innerHTML = `<tr><td colspan="6">No more students.</td></tr>`; return; }
         lastVisibleStudent = studentDocs.docs[studentDocs.docs.length - 1];
         document.getElementById('page-num').innerText = `PAGE ${currentPage}`;
 
-        // 2. Real-time Listener for Attendance logs
         const attQ = query(collection(db, "attendance"), where("eventId", "==", eventId));
         unsubscribeAttendance = onSnapshot(attQ, (snap) => {
             const logMap = {};
             snap.forEach(d => logMap[d.data().studentId] = d.data());
-
             tbody.innerHTML = "";
             let count = 0;
-
             studentDocs.forEach(sDoc => {
                 const s = sDoc.data();
                 const dept = classifyStudent(s.course);
-                
-                // Filtering
-                const isDeptMatch = (event.targetDept === "ALL" || event.targetDept === dept);
-                const isYearMatch = event.targetYears.includes(s.yearLevel.toString());
-
-                if (isDeptMatch && isYearMatch) {
+                if ((event.targetDept === "ALL" || event.targetDept === dept) && event.targetYears.includes(s.yearLevel.toString())) {
                     const log = logMap[sDoc.id];
                     const statusText = log ? log.status : "Absent";
                     const statusColor = log ? (log.status === "Present" ? "#16a34a" : "#ca8a04") : "#ef4444";
-
                     tbody.innerHTML += `
                         <tr style="border-bottom: 1px solid #f1f5f9;">
                             <td style="padding:15px; font-weight:700;">${s.fullName}</td>
-                            <td><span style="font-weight:600;">${sDoc.id}</span><br><small style="color:#64748b">${dept}</small></td>
+                            <td><span style="font-weight:600;">${sDoc.id}</span><br><small>${dept}</small></td>
                             <td>${s.course} - Year ${s.yearLevel}</td>
-                            <td style="font-family:monospace; font-weight:700;">${log ? log.timeIn : '--:--'}</td>
-                            <td style="font-family:monospace; font-weight:700;">${log ? (log.timeOut || '--:--') : '--:--'}</td>
-                            <td>
-                                <span class="status-badge" style="background:${statusColor}15; color:${statusColor}; border:1px solid ${statusColor}30">
-                                    ${statusText.toUpperCase()}
-                                </span>
-                            </td>
-                        </tr>
-                    `;
+                            <td>${log ? log.timeIn : '--:--'}</td>
+                            <td>${log ? (log.timeOut || '--:--') : '--:--'}</td>
+                            <td><span class="status-badge" style="background:${statusColor}15; color:${statusColor}">${statusText}</span></td>
+                        </tr>`;
                     count++;
                 }
             });
-
-            if(count === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:40px; color:#94a3b8;">No matching students on this page.</td></tr>`;
-            }
+            if(count === 0) tbody.innerHTML = `<tr><td colspan="6">No matches on this page.</td></tr>`;
         });
-    } catch (e) { console.error("Table Refresh Error:", e); }
+    } catch (e) { console.error("Table Error:", e); }
 }
 
-/**
- * EVENT LISTENERS
- */
 function setupCoreListeners() {
     const input = document.getElementById('manual-input');
     const btnSubmit = document.getElementById('btn-manual-submit');
     const eventSel = document.getElementById('attendance-event-id');
-
-    const handleManual = () => {
-        if(input.value.trim()) {
-            handleAttendanceInput(input.value.trim());
-            input.value = "";
-        }
-    };
-
+    const handleManual = () => { if(input.value.trim()) { handleAttendanceInput(input.value.trim()); input.value = ""; } };
     input.onkeypress = (e) => { if(e.key === 'Enter') handleManual(); };
     btnSubmit.onclick = handleManual;
     document.getElementById('btn-toggle-camera').onclick = (e) => toggleCameraScanner(e.currentTarget);
     document.getElementById('btn-export-csv').onclick = exportToCSV;
-    
-    eventSel.onchange = () => {
-        currentPage = 1;
-        lastVisibleStudent = null;
-        refreshAttendanceTable();
-    };
-
+    eventSel.onchange = () => { currentPage = 1; lastVisibleStudent = null; refreshAttendanceTable(); };
     document.getElementById('next-page').onclick = () => { currentPage++; refreshAttendanceTable(); };
-    document.getElementById('prev-page').onclick = () => { 
-        if(currentPage > 1) { currentPage--; lastVisibleStudent = null; refreshAttendanceTable(); } 
-    };
-
-    // Auto-focus manual input unless typing in other inputs
-    document.addEventListener('keydown', (e) => {
-        if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'SELECT') {
-            input.focus();
-        }
-    });
+    document.getElementById('prev-page').onclick = () => { if(currentPage > 1) { currentPage--; lastVisibleStudent = null; refreshAttendanceTable(); } };
+    document.addEventListener('keydown', (e) => { if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'SELECT') input.focus(); });
 }
 
-/**
- * EXPORT CSV
- */
 async function exportToCSV() {
     const eventId = document.getElementById('attendance-event-id').value;
-    if(!eventId) return Swal.fire("Export", "Please select an event first.", "info");
-
+    if(!eventId) return Swal.fire("Export", "Select event first.", "info");
     try {
         const q = query(collection(db, "attendance"), where("eventId", "==", eventId));
         const snap = await getDocs(q);
-        
         let csv = "ID,Name,Dept,Course_Year,Time_In,Time_Out,Status\n";
-        snap.forEach(doc => {
-            const v = doc.data();
-            csv += `"${v.studentId}","${v.studentName}","${v.classification}","${v.courseYear}","${v.timeIn}","${v.timeOut || ''}","${v.status}"\n`;
-        });
-
+        snap.forEach(doc => { const v = doc.data(); csv += `"${v.studentId}","${v.studentName}","${v.classification}","${v.courseYear}","${v.timeIn}","${v.timeOut || ''}","${v.status}"\n`; });
         const blob = new Blob([csv], { type: 'text/csv' });
         const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.setAttribute('hidden', '');
-        a.setAttribute('href', url);
-        a.setAttribute('download', `Attendance_${eventDataMap[eventId].name}_${new Date().toLocaleDateString()}.csv`);
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        const a = document.createElement('a'); a.href = url; a.download = `Attendance_${eventDataMap[eventId].name}.csv`; a.click();
     } catch (e) { console.error("CSV Error:", e); }
 }
