@@ -214,40 +214,86 @@ async function onScanSuccess(decodedText) {
  */
 async function refreshAttendanceTable(eventId, day) {
     const tbody = document.getElementById('attendance-tbody');
-    const q = query(collection(db, "attendance"), 
-              where("eventId", "==", eventId), 
-              where("day", "==", day));
+    const eventSelect = document.getElementById('attendance-event-id');
     
-    const snap = await getDocs(q);
-    tbody.innerHTML = "";
+    // Kunin natin ang text ng napiling event (e.g., "BTLED Year-End Party")
+    const selectedEventText = eventSelect.options[eventSelect.selectedIndex].text.toUpperCase();
 
-    if (snap.empty) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px;">No logs found for this day.</td></tr>`;
-        return;
+    if (!eventId || !day) return;
+
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px;">Filtering Participants...</td></tr>`;
+
+    try {
+        // 1. DYNAMIC FILTERING: 
+        // Hahanapin natin kung ang pangalan ng event ay may "BTLED" o "BTVTED" 
+        // para malaman kung sino lang ang dapat i-load na students.
+        let studentQuery = collection(db, "students");
+        
+        if (selectedEventText.includes("BTLED")) {
+            studentQuery = query(collection(db, "students"), where("course", "==", "BTLED"));
+        } else if (selectedEventText.includes("BTVTED")) {
+            studentQuery = query(collection(db, "students"), where("course", "==", "BTVTED"));
+        } else if (selectedEventText.includes("BSINDTECH")) {
+            studentQuery = query(collection(db, "students"), where("course", "==", "BSINDTECH"));
+        }
+        // Note: Kung ang event ay para sa LAHAT, wag maglagay ng 'where' clause.
+
+        const studentsSnap = await getDocs(studentQuery);
+        
+        // 2. Kunin ang mga Attendance Logs para sa araw na ito
+        const logsQuery = query(
+            collection(db, "attendance"), 
+            where("eventId", "==", eventId), 
+            where("day", "==", day)
+        );
+        const logsSnap = await getDocs(logsQuery);
+        
+        const attendanceData = {};
+        logsSnap.forEach(doc => {
+            attendanceData[doc.data().studentId] = doc.data();
+        });
+
+        tbody.innerHTML = "";
+
+        if (studentsSnap.empty) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px;">No students found for this course.</td></tr>`;
+            return;
+        }
+
+        // 3. I-render ang mga qualified participants
+        studentsSnap.forEach(sDoc => {
+            const student = sDoc.data();
+            const sId = sDoc.id;
+            const log = attendanceData[sId];
+            
+            const row = document.createElement('tr');
+            
+            // Status Logic
+            let statusHTML = `<span style="background:#ef4444; color:white; padding:3px 8px; border-radius:10px; font-size:10px; font-weight:800;">ABSENT</span>`;
+            if (log) {
+                const color = log.status === 'Present' ? '#22c55e' : '#eab308';
+                statusHTML = `<span style="background:${color}; color:white; padding:3px 8px; border-radius:10px; font-size:10px; font-weight:800;">${log.status.toUpperCase()}</span>`;
+            }
+
+            row.innerHTML = `
+                <td><b>${student.fullName}</b></td>
+                <td>
+                    <span style="font-weight:700;">${sId}</span><br>
+                    <small style="color:var(--hero-gold); font-weight:800; font-size:9px;">${classifyStudent(student.course)}</small>
+                </td>
+                <td>${student.course || 'N/A'}</td>
+                <td>${log ? log.timeIn : '--:--'}</td>
+                <td>${log ? (log.timeOut || '--:--') : '--:--'}</td>
+                <td>${statusHTML}</td>
+            `;
+            tbody.appendChild(row);
+        });
+
+    } catch (err) {
+        console.error("Error loading filtered participants:", err);
+        tbody.innerHTML = `<tr><td colspan="6" style="color:red; text-align:center;">Error loading data.</td></tr>`;
     }
-
-    snap.docs.forEach(d => {
-        const data = d.data();
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td><b>${data.studentName}</b></td>
-            <td>
-                <span style="font-weight:700;">${data.studentId}</span><br>
-                <small style="color:var(--hero-gold); font-weight:800; font-size:9px;">${data.classification || ''}</small>
-            </td>
-            <td>${data.courseYear}</td>
-            <td>${data.timeIn}</td>
-            <td>${data.timeOut || '--:--'}</td>
-            <td>
-                <span style="background:${data.status === 'Present' ? '#22c55e' : '#eab308'}; color:white; padding:3px 8px; border-radius:10px; font-size:10px; font-weight:800;">
-                    ${data.status.toUpperCase()}
-                </span>
-            </td>
-        `;
-        tbody.appendChild(row);
-    });
 }
-
 /**
  * FEEDBACK UI
  */
