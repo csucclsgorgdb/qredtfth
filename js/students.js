@@ -11,8 +11,22 @@ const PAGE_SIZE = 25;
 let currentSearch = "";
 
 /**
+ * HELPER: CLASSIFICATION LOGIC
+ * Automates the labeling of students based on their course/program.
+ */
+function getClassification(program) {
+    if (!program) return "UNCLASSIFIED";
+    const p = program.toUpperCase();
+    if (p.includes("BTLED") || p.includes("BTVTED")) {
+        return "EDUCATION STUDENT";
+    } else if (p.includes("BSINDTECH")) {
+        return "INDUSTRIAL TECHNOLOGY STUDENT";
+    }
+    return "OTHER DEPARTMENT";
+}
+
+/**
  * SECURITY: SANITIZATION
- * Prevents XSS by converting HTML tags to plain text.
  */
 function sanitize(str) {
     if (!str) return "";
@@ -31,7 +45,7 @@ export async function initStudents() {
         <div class="module-header" style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:30px;">
             <div>
                 <h1 class="module-title" style="font-weight:800; color:var(--hero-navy);">Student Management</h1>
-                <p class="module-subtitle">ID • Name • College • Course/Program • Year</p>
+                <p class="module-subtitle">Manage records for Education and Industrial Technology Departments.</p>
             </div>
             <div style="display:flex; gap:12px;">
                 <div class="search-box" style="position:relative;">
@@ -50,8 +64,8 @@ export async function initStudents() {
             <table class="data-table">
                 <thead>
                     <tr>
+                        <th>STUDENT NAME & CLASSIFICATION</th>
                         <th>ID NUMBER</th>
-                        <th>STUDENT NAME</th>
                         <th>COLLEGE</th>
                         <th>COURSE / PROGRAM</th>
                         <th>YEAR</th>
@@ -126,7 +140,6 @@ async function loadStudents() {
     try {
         let constraints = [orderBy("fullName"), limit(PAGE_SIZE)];
 
-        // Global Search Logic
         if (currentSearch) {
             constraints = [
                 where("fullName", ">=", currentSearch),
@@ -136,7 +149,6 @@ async function loadStudents() {
             ];
         }
 
-        // Apply Page Marker
         if (currentPage > 0 && pageStack.length > 0) {
             const startDoc = pageStack[pageStack.length - 1];
             constraints.push(startAfter(startDoc));
@@ -154,23 +166,26 @@ async function loadStudents() {
         }
 
         lastVisible = snapshot.docs[snapshot.docs.length - 1];
-        
-        // Update UI State
         indicator.innerText = `Page ${currentPage + 1}`;
         prevBtn.disabled = currentPage === 0;
         nextBtn.disabled = snapshot.docs.length < PAGE_SIZE;
 
         snapshot.forEach(docSnap => {
             const s = docSnap.data();
+            const classification = getClassification(s.program); // Automatic Classification
+
             const row = document.createElement('tr');
             row.innerHTML = `
+                <td>
+                    <b style="text-transform: uppercase;">${sanitize(s.fullName)}</b><br>
+                    <small style="color:var(--hero-gold); font-weight:800; font-size:10px;">${classification}</small>
+                </td>
                 <td><b>${sanitize(s.studentId)}</b></td>
-                <td style="text-transform: uppercase;">${sanitize(s.fullName)}</td>
                 <td>${sanitize(s.college)}</td>
-                <td><span class="badge" style="background:#f1f5f9; color:#0a192f; border:1px solid #e2e8f0;">${sanitize(s.program)}</span></td>
+                <td><span class="badge" style="background:#f1f5f9; color:var(--hero-navy); border:1px solid #e2e8f0; font-weight:700;">${sanitize(s.program)}</span></td>
                 <td>${sanitize(s.yearLevel)}</td>
                 <td style="text-align:right">
-                    <button class="btn-edit" data-id="${docSnap.id}" style="border:none; background:none; color:#0a192f; cursor:pointer;"><i data-lucide="edit-3" style="width:18px"></i></button>
+                    <button class="btn-edit" data-id="${docSnap.id}" style="border:none; background:none; color:var(--hero-navy); cursor:pointer;"><i data-lucide="edit-3" style="width:18px"></i></button>
                     <button class="btn-delete" data-id="${docSnap.id}" style="border:none; background:none; color:#ef4444; cursor:pointer; margin-left:12px;"><i data-lucide="trash-2" style="width:18px"></i></button>
                 </td>
             `;
@@ -181,7 +196,7 @@ async function loadStudents() {
         lucide.createIcons();
     } catch (e) { 
         console.error("Load Error:", e);
-        tbody.innerHTML = "<tr><td colspan='6' style='text-align:center; color:red;'>Index required. Check console for link.</td></tr>";
+        tbody.innerHTML = "<tr><td colspan='6' style='text-align:center; color:red;'>Error loading data. Check Firestore Indexes.</td></tr>";
     }
 }
 
@@ -197,7 +212,7 @@ async function showStudentModal(studentId = null) {
     }
 
     const { value: formValues } = await Swal.fire({
-        title: `<span style="font-weight:800; color:#0a192f">${studentId ? 'EDIT STUDENT' : 'ADD NEW STUDENT'}</span>`,
+        title: `<span style="font-weight:800; color:var(--hero-navy)">${studentId ? 'EDIT STUDENT' : 'ADD NEW STUDENT'}</span>`,
         html: `
             <div style="text-align:left;">
                 <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">ID NUMBER</label>
@@ -218,16 +233,20 @@ async function showStudentModal(studentId = null) {
                 </div>
 
                 <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">COURSE / PROGRAM</label>
-                <input id="swal-program" class="swal2-input" style="margin:0; width:100%;" value="${sanitize(s.program)}">
+                <input id="swal-program" class="swal2-input" placeholder="e.g. BTLED" style="margin:0; width:100%; text-transform:uppercase;" value="${sanitize(s.program)}">
             </div>
         `,
         showCancelButton: true,
         confirmButtonText: 'Save Record',
-        confirmButtonColor: '#0a192f',
+        confirmButtonColor: '#001a3d',
         preConfirm: () => {
+            const sid = document.getElementById('swal-id').value.trim();
+            const fname = document.getElementById('swal-name').value.trim().toUpperCase();
+            if (!sid || !fname) return Swal.showValidationMessage('ID and Name are required');
+            
             return {
-                studentId: document.getElementById('swal-id').value.trim(),
-                fullName: document.getElementById('swal-name').value.trim().toUpperCase(),
+                studentId: sid,
+                fullName: fname,
                 college: document.getElementById('swal-college').value.trim().toUpperCase(),
                 program: document.getElementById('swal-program').value.trim().toUpperCase(),
                 yearLevel: document.getElementById('swal-year').value.trim()
@@ -235,7 +254,7 @@ async function showStudentModal(studentId = null) {
         }
     });
 
-    if (formValues && formValues.studentId && formValues.fullName) {
+    if (formValues) {
         try {
             await updateDoc(doc(db, "students", formValues.studentId), formValues).catch(async () => {
                 await writeBatch(db).set(doc(db, "students", formValues.studentId), { ...formValues, balance: 0 }).commit();
@@ -314,5 +333,5 @@ async function handleFileUpload(event) {
         } catch (err) { Swal.fire('Error', err.message, 'error'); }
     };
     reader.readAsArrayBuffer(file);
-    event.target.value = ""; // Clear file input
+    event.target.value = ""; 
 }
