@@ -346,3 +346,111 @@ body {
     outline: none;
     width: 280px; /* Slight expansion on focus */
 }
+
+
+/* --- 10. LOGIN PAGE STYLES (INDEX.HTML) --- */
+body.login-page {
+    background: linear-gradient(135deg, var(--hero-navy-dark) 0%, var(--hero-navy) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    width: 100vw;
+    margin: 0;
+}
+
+.login-card {
+    background: var(--white);
+    padding: 40px;
+    border-radius: 24px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+    border-top: 8px solid var(--hero-gold);
+    animation: fadeInScale 0.5s ease-out;
+}
+
+.login-logo {
+    width: 80px;
+    height: 80px;
+    margin-bottom: 20px;
+    object-fit: contain;
+}
+
+.login-card h2 {
+    font-weight: 800;
+    font-size: 1.5rem;
+    margin-bottom: 30px;
+    letter-spacing: -0.5px;
+}
+
+/* Login Form Inputs */
+#login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+#login-form input {
+    width: 100%;
+    padding: 14px 18px;
+    border: 1.5px solid var(--border-color);
+    border-radius: 12px;
+    font-size: 0.95rem;
+    transition: var(--transition);
+    background: #f8fafc;
+}
+
+#login-form input:focus {
+    border-color: var(--hero-gold);
+    background: white;
+    box-shadow: 0 0 0 4px var(--hero-gold-glow);
+    outline: none;
+}
+
+/* Primary Button for Login */
+.btn-primary {
+    background: var(--hero-navy);
+    color: white;
+    padding: 14px;
+    border-radius: 12px;
+    border: none;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: var(--transition);
+    margin-top: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.btn-primary:hover {
+    background: var(--hero-navy-light);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 15px rgba(0, 26, 61, 0.3);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+}
+
+/* Animation for smooth entrance */
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* Mobile adjustments */
+@media (max-width: 480px) {
+    .login-card {
+        margin: 20px;
+        padding: 30px 20px;
+    }
+}
