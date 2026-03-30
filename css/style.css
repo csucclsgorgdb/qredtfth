@@ -385,3 +385,28 @@ body.login-page { background: linear-gradient(135deg, var(--hero-navy-dark) 0%, 
             font-size: 0.7rem;
             font-weight: 800;
         }
+
+#sidebar {
+    /* ... your existing code ... */
+    height: 100vh !important; /* Forces sidebar to be 100% of the screen height */
+    position: fixed; /* Keeps it stuck to the left while the list scrolls */
+    left: 0;
+    top: 0;
+    overflow-y: auto; /* Allows the menu icons to scroll if the screen is very short */
+    display: flex;
+    flex-direction: column;
+    z-index: 1000;
+}
+
+#content {
+    width: 100%;
+    margin-left: 250px; /* Match this to your desktop sidebar width */
+    transition: all 0.3s;
+}
+
+/* For your collapsed/portrait mobile state shown in your screenshot */
+#sidebar.collapsed + #content,
+#content.expanded {
+    margin-left: 80px; /* Match this to your slim sidebar width in 9800.png */
+    width: calc(100% - 80px);
+}
