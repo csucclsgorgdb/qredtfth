@@ -75,7 +75,7 @@
                 </div>
                 <div class="header-text">
                     <h3>HERO</h3>
-                    <span>INTEGRATED SYSTEM</span>
+                    <span>WEB SYSTEM</span>
                 </div>
             </div>
 
@@ -93,13 +93,18 @@
                 <li><a href="#" class="nav-link" data-module="events"><i data-lucide="calendar-days"></i> <span>Events</span></a></li>
                 <li><a href="#" class="nav-link" data-module="attendance"><i data-lucide="user-check"></i> <span>Attendance</span></a></li>
                 <li><a href="#" class="nav-link" data-module="finance"><i data-lucide="wallet"></i> <span>Finance</span></a></li>
-                <li class="admin-only"><a href="#" class="nav-link" data-module="settings"><i data-lucide="settings"></i> <span>Settings</span></a></li>
-            </ul>
-
-            <button id="logout-btn" class="logout-btn">
-                <i data-lucide="log-out"></i> <span>Logout</span>
-            </button>
-        </nav>
+               
+                <div class="sidebar-footer">
+        <li class="admin-only" style="list-style:none;">
+            <a href="#" class="nav-link" data-module="settings" style="border-top: 1px solid rgba(255,255,255,0.1); padding-top:15px;">
+                <i data-lucide="settings"></i> <span>Settings</span>
+            </a>
+        </li>
+        <button id="logout-btn" class="logout-btn">
+            <i data-lucide="log-out"></i> <span>Logout</span>
+        </button>
+    </div>
+</nav>
 
         <div id="content">
             <header class="top-nav">
