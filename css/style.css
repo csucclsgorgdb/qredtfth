@@ -270,3 +270,79 @@ body {
     .nav-link { justify-content: center; }
     .dashboard-grid { grid-template-columns: 1fr; }
 }
+
+/* --- BUTTON BASE STYLES --- */
+.btn-navy, .btn-gold {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px 24px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    height: 42px; /* Uniform height for alignment */
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* --- BULK IMPORT (NAVY) --- */
+.btn-navy {
+    background-color: var(--hero-navy);
+    color: #ffffff;
+}
+
+.btn-navy:hover {
+    background-color: var(--hero-navy-light);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(0, 26, 61, 0.2);
+}
+
+.btn-navy:active {
+    transform: translateY(0);
+}
+
+/* --- ADD STUDENT (GOLD) --- */
+.btn-gold {
+    background-color: var(--hero-gold);
+    color: var(--hero-navy);
+}
+
+.btn-gold:hover {
+    background-color: #f5c200; /* Slightly deeper gold for hover */
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px var(--hero-gold-glow);
+}
+
+.btn-gold:active {
+    transform: translateY(0);
+}
+
+/* --- ICON ALIGNMENT --- */
+.btn-navy i, .btn-gold i {
+    width: 18px;
+    height: 18px;
+    stroke-width: 2.5px; /* Makes Lucide icons look bolder and more premium */
+}
+
+/* --- SEARCH BOX ALIGNMENT --- */
+.search-box input {
+    height: 40px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding-left: 40px;
+    font-size: 0.9rem;
+    color: var(--hero-navy);
+    transition: all 0.2s ease;
+}
+
+.search-box input:focus {
+    border-color: var(--hero-gold);
+    box-shadow: 0 0 0 3px var(--hero-gold-glow);
+    outline: none;
+    width: 280px; /* Slight expansion on focus */
+}
