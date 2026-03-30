@@ -6,15 +6,15 @@ import {
 let html5QrCode = null;
 let eventDataMap = {};
 let isScannerActive = false;
-let unsubscribeAttendance = null; // Para sa Live Updates
+let unsubscribeAttendance = null;
 
-// Pagination State
+// Pagination State - Tinaasan sa 50 para sa Android efficiency
 let lastVisibleStudent = null;
 let currentPage = 1;
-const PAGE_SIZE = 20; 
+const PAGE_SIZE = 50; 
 
 /**
- * DYNAMIC CLASSIFICATION - Siniguradong match sa Event Logic
+ * DYNAMIC CLASSIFICATION
  */
 function classifyStudent(course) {
     if (!course) return "Other";
@@ -42,67 +42,54 @@ export async function initAttendance() {
     container.innerHTML = `
         <div class="module-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; padding:0 10px;">
             <div>
-                <h1 style="color:var(--hero-navy); font-weight:800; margin:0;">Attendance Management</h1>
-                <p style="margin:0; font-size:12px; color:#64748b;">Automated Participant Filtering Active</p>
+                <h1 style="color:var(--hero-navy); font-weight:800; margin:0; font-size:1.5rem;">Attendance Scan</h1>
+                <p style="margin:0; font-size:12px; color:#64748b;">Live participant filtering active.</p>
             </div>
-            <div style="display:flex; gap:10px; align-items:center;">
-                <select id="attendance-event-id" class="swal2-input" style="margin:0; width:220px; height:45px; font-size:13px; border-radius:10px;">
+            <div style="display:flex; gap:8px;">
+                <select id="attendance-event-id" class="swal2-input" style="margin:0; width:180px; height:45px; font-size:12px; border-radius:10px;">
                     <option value="">-- Select Event --</option>
                     ${eventOptions}
                 </select>
-                <button id="btn-toggle-camera" class="btn-gold" style="height:45px; width:160px; border-radius:10px; font-weight:700;">
-                    <i data-lucide="camera"></i> <span>Open Camera</span>
-                </button>
+                <button id="btn-toggle-camera" class="btn-gold" style="height:45px; width:50px; border-radius:10px;"><i data-lucide="camera"></i></button>
             </div>
         </div>
 
-        <div class="dashboard-grid" style="grid-template-columns: 1fr 1.8fr; gap:15px; padding:0 10px;">
-            <div style="display:flex; flex-direction:column; gap:15px;">
-                <div class="dashboard-card" style="padding:10px; background:#0f172a; border-radius:20px; min-height:280px; position:relative; overflow:hidden; border:4px solid #1e293b;">
-                    <div id="reader" style="width:100%; display:none;"></div>
-                    <div id="camera-placeholder" style="width:100%; height:280px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#475569;">
-                        <i data-lucide="aperture" class="spin" style="width:50px; height:50px; opacity:0.3;"></i>
-                        <p style="font-size:12px; font-weight:600; margin-top:10px;">SCANNER READY</p>
-                    </div>
+        <div class="dashboard-grid" style="grid-template-columns: 1fr; gap:15px; padding:0 10px;">
+            <div class="dashboard-card" style="padding:5px; background:#000; border-radius:15px; overflow:hidden; position:relative; min-height:200px;">
+                <div id="reader" style="width:100%;"></div>
+                <div id="camera-placeholder" style="width:100%; height:200px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#475569; background:#1e293b;">
+                    <p style="font-size:12px; font-weight:700;">CAMERA CLOSED</p>
                 </div>
+            </div>
 
-                <div id="scan-feedback" class="dashboard-card" style="text-align:center; transition: 0.3s ease; border:2px solid #e2e8f0; min-height:120px; display:flex; flex-direction:column; justify-content:center;">
-                    <h2 id="scan-id" style="margin:0; color:var(--hero-navy); font-weight:900; font-size:1.4rem;">READY</h2>
-                    <p id="scan-status" style="margin:5px 0 0 0; font-weight:700; font-size:0.9rem; color:#64748b;">Waiting for Student...</p>
-                </div>
+            <div id="scan-feedback" class="dashboard-card" style="text-align:center; padding:15px; border:2px solid #e2e8f0; border-radius:15px;">
+                <h2 id="scan-id" style="margin:0; font-weight:900; color:var(--hero-navy);">READY</h2>
+                <p id="scan-status" style="margin:0; font-size:13px; font-weight:600; color:#64748b;">Waiting for Scan...</p>
+            </div>
 
-                <div class="dashboard-card" style="padding:15px; border-bottom: 5px solid var(--hero-gold);">
-                    <div style="display:flex; gap:8px;">
-                        <input type="text" id="manual-input" class="swal2-input" placeholder="Enter ID Number..." style="margin:0; flex:1; height:50px; text-align:center; font-weight:800; border:2px solid #cbd5e1; border-radius:12px;">
-                        <button id="btn-manual-submit" class="btn-gold" style="width:60px; height:50px; border-radius:12px;"><i data-lucide="arrow-right"></i></button>
-                    </div>
+            <div class="dashboard-card" style="padding:15px;">
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="manual-input" class="swal2-input" placeholder="Type Student ID..." style="margin:0; flex:1; height:45px; text-align:center; font-weight:800; border-radius:10px;">
+                    <button id="btn-manual-submit" class="btn-gold" style="width:50px; height:45px; border-radius:10px;"><i data-lucide="send"></i></button>
                 </div>
             </div>
 
             <div class="dashboard-card" style="padding:15px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                    <h3 style="margin:0; font-size:15px;"><i data-lucide="clipboard-check"></i> Live Participant List</h3>
-                    <div style="display:flex; gap:10px;">
-                        <button id="btn-export-csv" class="btn-gold" style="padding:0 15px; height:32px; font-size:11px;">CSV</button>
-                        <div style="display:flex; gap:4px; background:#f1f5f9; padding:4px; border-radius:10px;">
-                            <button id="prev-page" class="btn-gold" style="padding:0 10px; height:32px;"><</button>
-                            <span id="page-num" style="font-size:12px; font-weight:800; min-width:45px; text-align:center; line-height:32px;">Pg 1</span>
-                            <button id="next-page" class="btn-gold" style="padding:0 10px; height:32px;">></button>
-                        </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h3 style="margin:0; font-size:14px;">Participants</h3>
+                    <div style="display:flex; gap:5px; align-items:center;">
+                        <button id="prev-page" class="btn-gold" style="padding:0 8px; height:30px;"><</button>
+                        <span id="page-num" style="font-size:11px; font-weight:800;">Pg 1</span>
+                        <button id="next-page" class="btn-gold" style="padding:0 8px; height:30px;">></button>
                     </div>
                 </div>
-                <div class="data-table-container" style="max-height: 550px; overflow-y:auto; border-radius:10px;">
-                    <table class="data-table" style="font-size:11px; width:100%;">
+                <div style="overflow-x:auto;">
+                    <table class="data-table" style="font-size:10px; width:100%;">
                         <thead>
-                            <tr>
-                                <th>STUDENT NAME</th>
-                                <th>ID & DEPT</th>
-                                <th>IN/OUT</th>
-                                <th>STATUS</th>
-                            </tr>
+                            <tr><th>NAME</th><th>ID/DEPT</th><th>IN/OUT</th><th>STATUS</th></tr>
                         </thead>
                         <tbody id="attendance-tbody">
-                            <tr><td colspan="4" style="text-align:center; padding:50px; color:#94a3b8;">Select an event.</td></tr>
+                            <tr><td colspan="4" style="text-align:center; padding:30px;">Select an event.</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -118,15 +105,14 @@ function setupEventListeners() {
     const manualInput = document.getElementById('manual-input');
     const eventSelect = document.getElementById('attendance-event-id');
 
-    const triggerSubmit = () => {
+    const submitId = () => {
         const val = manualInput.value.trim();
         if (val) { handleAttendanceInput(val); manualInput.value = ""; }
     };
 
-    manualInput.onkeypress = (e) => { if (e.key === 'Enter') triggerSubmit(); };
-    document.getElementById('btn-manual-submit').onclick = triggerSubmit;
-    document.getElementById('btn-toggle-camera').onclick = (e) => toggleCameraScanner(e.currentTarget);
-    document.getElementById('btn-export-csv').onclick = exportToCSV;
+    manualInput.onkeypress = (e) => { if (e.key === 'Enter') submitId(); };
+    document.getElementById('btn-manual-submit').onclick = submitId;
+    document.getElementById('btn-toggle-camera').onclick = toggleCameraScanner;
     
     eventSelect.onchange = () => {
         currentPage = 1;
@@ -136,30 +122,23 @@ function setupEventListeners() {
 
     document.getElementById('next-page').onclick = () => { currentPage++; refreshAttendanceTable(); };
     document.getElementById('prev-page').onclick = () => { if(currentPage > 1) { currentPage--; lastVisibleStudent = null; refreshAttendanceTable(); } };
-
-    // Auto-focus manual input for Scan Gun users
-    document.addEventListener('keydown', () => {
-        if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'SELECT') {
-            manualInput.focus();
-        }
-    });
 }
 
 /**
- * REFRESH TABLE - Connected to Event Module Filtering
+ * REFRESH TABLE - Android Hybrid Filter (No Index Link Needed)
  */
 async function refreshAttendanceTable() {
     const eventId = document.getElementById('attendance-event-id').value;
     const tbody = document.getElementById('attendance-tbody');
     if (!eventId) return;
 
-    if (unsubscribeAttendance) unsubscribeAttendance(); // Clean up old listeners
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:20px;">Filtering Participants...</td></tr>`;
+    if (unsubscribeAttendance) unsubscribeAttendance();
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:20px;">Fetching List...</td></tr>`;
 
     try {
         const event = eventDataMap[eventId];
         
-        // Step 1: Fetch Students (Paginated)
+        // Single where query para hindi mag-error sa Android/No Console
         let studentQuery = query(collection(db, "students"), orderBy("fullName"), limit(PAGE_SIZE));
         if (currentPage > 1 && lastVisibleStudent) {
             studentQuery = query(collection(db, "students"), orderBy("fullName"), startAfter(lastVisibleStudent), limit(PAGE_SIZE));
@@ -167,78 +146,66 @@ async function refreshAttendanceTable() {
 
         const studentsSnap = await getDocs(studentQuery);
         if (studentsSnap.empty) {
-            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:20px;">No students found.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:20px;">No more students.</td></tr>`;
             return;
         }
 
         lastVisibleStudent = studentsSnap.docs[studentsSnap.docs.length - 1];
         document.getElementById('page-num').innerText = `Pg ${currentPage}`;
 
-        // Step 2: Set up Live Listener for Attendance Logs of THIS event
         const attendanceQuery = query(collection(db, "attendance"), where("eventId", "==", eventId));
         unsubscribeAttendance = onSnapshot(attendanceQuery, (snap) => {
-            const currentLogs = {};
-            snap.forEach(d => currentLogs[d.data().studentId] = d.data());
+            const logs = {};
+            snap.forEach(d => logs[d.data().studentId] = d.data());
 
             tbody.innerHTML = "";
-            let matchInPage = 0;
+            let shownCount = 0;
 
             studentsSnap.forEach(sDoc => {
                 const s = sDoc.data();
                 const dept = classifyStudent(s.course);
-                
-                // CONNECTION LOGIC: Filter students based on Event Participants Setting
                 const isDeptMatch = (event.targetDept === "ALL" || event.targetDept === dept);
                 const isYearMatch = event.targetYears.includes(s.yearLevel.toString());
 
                 if (isDeptMatch && isYearMatch) {
-                    const log = currentLogs[sDoc.id];
+                    const log = logs[sDoc.id];
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td style="font-weight:700;">${s.fullName}</td>
-                        <td>${sDoc.id}<br><small style="color:#64748b">${dept}</small></td>
-                        <td style="font-family:monospace; font-weight:bold;">${log ? `${log.timeIn}${log.timeOut ? ' / ' + log.timeOut : ''}` : '--:--'}</td>
-                        <td>${log ? `<span style="color:#16a34a; font-weight:800;">${log.status.toUpperCase()}</span>` : `<span style="color:#ef4444; font-weight:800;">ABSENT</span>`}</td>
+                        <td>${sDoc.id}<br><small>${dept}</small></td>
+                        <td style="font-family:monospace;">${log ? `${log.timeIn}${log.timeOut ? '/' + log.timeOut : ''}` : '--'}</td>
+                        <td style="font-weight:800; color:${log ? '#16a34a' : '#ef4444'}">${log ? log.status.toUpperCase() : 'ABSENT'}</td>
                     `;
                     tbody.appendChild(tr);
-                    matchInPage++;
+                    shownCount++;
                 }
             });
 
-            if(matchInPage === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:20px; color:#94a3b8;">No matching participants on this page. Try Next.</td></tr>`;
+            if(shownCount === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:20px;">No participants on this page. Click Next.</td></tr>`;
             }
         });
-    } catch (err) { console.error("Table Error:", err); }
+    } catch (err) { tbody.innerHTML = `<tr><td colspan="4" style="color:red;">Error loading list.</td></tr>`; }
 }
 
 /**
- * ATTENDANCE HANDLER (SCAN/MANUAL)
+ * HANDLE SCAN/INPUT
  */
 async function handleAttendanceInput(studentId) {
     const eventId = document.getElementById('attendance-event-id').value;
-    if (!eventId) return Swal.fire("Required", "Please select an event first.", "warning");
-
-    const beep = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-    const errorSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2873/2873-preview.mp3');
+    if (!eventId) return Swal.fire("Event Required", "Select an event first.", "warning");
 
     try {
         const studentSnap = await getDoc(doc(db, "students", studentId));
-        if (!studentSnap.exists()) {
-            updateUI("UNKNOWN ID", "NOT FOUND", "danger");
-            errorSound.play();
-            return;
-        }
+        if (!studentSnap.exists()) return updateUI("UNKNOWN ID", "NOT FOUND", "danger");
 
         const student = studentSnap.data();
         const event = eventDataMap[eventId];
         const dept = classifyStudent(student.course);
 
-        // CHECK ELIGIBILITY BEFORE LOGGING
+        // Eligibility Check
         if ((event.targetDept !== "ALL" && event.targetDept !== dept) || !event.targetYears.includes(student.yearLevel.toString())) {
-            updateUI(student.fullName, "NOT ELIGIBLE", "danger");
-            errorSound.play();
-            return;
+            return updateUI(student.fullName, "NOT ELIGIBLE", "danger");
         }
 
         const attendRef = doc(db, "attendance", `${eventId}_${studentId}`);
@@ -250,46 +217,56 @@ async function handleAttendanceInput(studentId) {
                 studentId, studentName: student.fullName, classification: dept,
                 eventId, eventName: event.name, timeIn: now, status: "In Venue", timestamp: serverTimestamp()
             });
-            updateUI(student.fullName, "CHECK-IN OK", "success");
+            updateUI(student.fullName, "TIME IN", "success");
         } else if (attendSnap.data().status === "In Venue") {
             await updateDoc(attendRef, { timeOut: now, status: "Present" });
-            updateUI(student.fullName, "CHECK-OUT OK", "info");
+            updateUI(student.fullName, "TIME OUT", "info");
         } else {
-            updateUI(student.fullName, "ALREADY LOGGED", "warning");
+            updateUI(student.fullName, "COMPLETED", "warning");
         }
-        beep.play();
-    } catch (err) { console.error("Logging Error:", err); }
+    } catch (err) { console.error(err); }
 }
 
 /**
- * CAMERA CONTROLLER
+ * CAMERA FIX FOR ANDROID
  */
-async function toggleCameraScanner(btn) {
+async function toggleCameraScanner() {
     const reader = document.getElementById('reader');
     const ph = document.getElementById('camera-placeholder');
-    const span = btn.querySelector('span');
 
     if (isScannerActive) {
-        if (html5QrCode) { await html5QrCode.stop(); html5QrCode = null; }
-        reader.style.display = 'none'; ph.style.display = 'flex';
-        span.innerText = "Open Camera"; btn.style.background = "";
+        if (html5QrCode) {
+            await html5QrCode.stop();
+            html5QrCode = null;
+        }
+        reader.style.display = 'none';
+        ph.style.display = 'flex';
         isScannerActive = false;
     } else {
-        reader.style.display = 'block'; ph.style.display = 'none';
-        span.innerText = "Starting...";
+        // RESET CAMERA INSTANCE
+        reader.style.display = 'block';
+        ph.style.display = 'none';
+        
         try {
+            // Check permissions first
+            await Html5Qrcode.getCameras(); 
+            
             html5QrCode = new Html5Qrcode("reader");
-            await html5QrCode.start({ facingMode: "environment" }, { fps: 20, qrbox: 250 }, (text) => {
-                handleAttendanceInput(text);
-                html5QrCode.pause(true);
-                setTimeout(() => { if(html5QrCode) html5QrCode.resume(); }, 2500);
-            });
-            span.innerText = "Close Camera"; btn.style.background = "#ef4444";
+            await html5QrCode.start(
+                { facingMode: "environment" }, 
+                { fps: 15, qrbox: 250 }, 
+                (text) => {
+                    handleAttendanceInput(text);
+                    html5QrCode.pause(true);
+                    setTimeout(() => { if(html5QrCode) html5QrCode.resume(); }, 3000);
+                }
+            );
             isScannerActive = true;
-        } catch (err) { 
-            console.error(err); 
-            span.innerText = "Open Camera"; 
-            Swal.fire("Camera Error", "Check permissions or if camera is used by another app.", "error");
+        } catch (err) {
+            console.error(err);
+            Swal.fire("Camera Error", "Please allow camera access and refresh the page.", "error");
+            reader.style.display = 'none';
+            ph.style.display = 'flex';
         }
     }
 }
@@ -299,16 +276,14 @@ function updateUI(name, status, type) {
     const theme = { success: '#dcfce7', info: '#dbeafe', warning: '#fef9c3', danger: '#fee2e2' };
     idEl.innerText = name; stEl.innerText = status;
     box.style.background = theme[type];
-    setTimeout(() => { idEl.innerText = "READY"; stEl.innerText = "Waiting for Student..."; box.style.background = "white"; }, 3000);
+    setTimeout(() => { idEl.innerText = "READY"; stEl.innerText = "Waiting for Scan..."; box.style.background = "white"; }, 3000);
 }
 
 async function exportToCSV() {
     const eventId = document.getElementById('attendance-event-id').value;
-    if(!eventId) return Swal.fire("Error", "Select an event first.", "error");
+    if(!eventId) return;
     const snap = await getDocs(query(collection(db, "attendance"), where("eventId", "==", eventId)));
-    if (snap.empty) return Swal.fire("Empty", "No records to export.", "info");
-
-    let csv = "ID,Name,Department,In,Out,Status\n";
+    let csv = "ID,Name,Dept,In,Out,Status\n";
     snap.forEach(d => {
         const v = d.data();
         csv += `"${v.studentId}","${v.studentName}","${v.classification}","${v.timeIn}","${v.timeOut || ''}","${v.status}"\n`;
