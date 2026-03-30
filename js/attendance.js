@@ -3,7 +3,7 @@ import {
     collection, doc, getDoc, getDocs, setDoc, updateDoc, query, where, serverTimestamp, limit, startAfter, orderBy 
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-let html5QrCode;
+let html5QrCode = null;
 let eventDataMap = {};
 let isScannerActive = false;
 
@@ -42,7 +42,7 @@ export async function initAttendance() {
         <div class="module-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
             <div>
                 <h1 class="module-title" style="color:var(--hero-navy); font-weight:800;">Attendance Management</h1>
-                <p class="module-subtitle">Real-time Camera Scan with Manual Fallback.</p>
+                <p class="module-subtitle">Scan QR Code or Manual ID Input.</p>
             </div>
             
             <div style="display:flex; gap:10px; align-items:center;">
@@ -59,11 +59,9 @@ export async function initAttendance() {
         <div class="dashboard-grid" style="grid-template-columns: 1fr 1.6fr; gap:20px;">
             
             <div style="display:flex; flex-direction:column; gap:15px;">
-                <div class="dashboard-card" style="padding:10px; position:relative; background:#000; border-radius:15px; min-height:250px;">
-                    <div id="scanner-container" style="width:100%; border-radius:10px; overflow:hidden; display:none;">
-                        <div id="reader"></div>
-                    </div>
-                    <div id="camera-placeholder" style="width:100%; height:250px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#94a3b8;">
+                <div class="dashboard-card" style="padding:10px; background:#000; border-radius:15px; min-height:250px; position:relative; overflow:hidden;">
+                    <div id="reader" style="width:100%; display:none;"></div>
+                    <div id="camera-placeholder" style="width:100%; height:250px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#94a3b8; background:#1e293b;">
                         <i data-lucide="camera-off" style="width:40px; height:40px; margin-bottom:10px; opacity:0.5;"></i>
                         <p style="font-size:13px; font-weight:600;">Camera is currently closed</p>
                     </div>
@@ -89,9 +87,9 @@ export async function initAttendance() {
                     <h3 style="margin:0;"><i data-lucide="users"></i> Participants List</h3>
                     <div style="display:flex; gap:10px; align-items:center;">
                         <div style="display:flex; gap:5px; align-items:center; background:#f1f5f9; padding:5px; border-radius:8px;">
-                            <button id="prev-page" class="btn-gold" style="padding:2px 8px; height:30px;"><</button>
+                            <button id="prev-page" class="btn-gold" style="padding:2px 8px; height:30px; min-width:30px;"><</button>
                             <span id="page-num" style="font-size:11px; font-weight:800; min-width:40px; text-align:center;">Pg 1</span>
-                            <button id="next-page" class="btn-gold" style="padding:2px 8px; height:30px;">></button>
+                            <button id="next-page" class="btn-gold" style="padding:2px 8px; height:30px; min-width:30px;">></button>
                         </div>
                         <button id="btn-export-csv" class="btn-gold" style="padding:5px 12px; font-size:11px;">CSV</button>
                     </div>
@@ -100,12 +98,7 @@ export async function initAttendance() {
                     <table class="data-table" style="font-size:10px;">
                         <thead>
                             <tr>
-                                <th>NAME</th>
-                                <th>ID & DEPT</th>
-                                <th>COURSE/YR</th>
-                                <th>IN</th>
-                                <th>OUT</th>
-                                <th>STATUS</th>
+                                <th>NAME</th><th>ID & DEPT</th><th>COURSE/YR</th><th>IN</th><th>OUT</th><th>STATUS</th>
                             </tr>
                         </thead>
                         <tbody id="attendance-tbody">
@@ -121,15 +114,9 @@ export async function initAttendance() {
     lucide.createIcons();
 }
 
-/**
- * EVENT LISTENERS
- */
 function setupEventListeners() {
-    const eventSelect = document.getElementById('attendance-event-id');
     const manualInput = document.getElementById('manual-input');
-    const manualBtn = document.getElementById('btn-manual-submit');
-    const cameraBtn = document.getElementById('btn-toggle-camera');
-    const exportBtn = document.getElementById('btn-export-csv');
+    const eventSelect = document.getElementById('attendance-event-id');
 
     const processInput = () => {
         const val = manualInput.value.trim();
@@ -137,9 +124,9 @@ function setupEventListeners() {
     };
 
     manualInput.onkeypress = (e) => { if (e.key === 'Enter') processInput(); };
-    manualBtn.onclick = processInput;
-    cameraBtn.onclick = () => toggleCameraScanner(cameraBtn);
-    exportBtn.onclick = exportToCSV;
+    document.getElementById('btn-manual-submit').onclick = processInput;
+    document.getElementById('btn-toggle-camera').onclick = (e) => toggleCameraScanner(e.currentTarget);
+    document.getElementById('btn-export-csv').onclick = exportToCSV;
     
     eventSelect.onchange = () => {
         currentPage = 1;
@@ -149,14 +136,9 @@ function setupEventListeners() {
 
     document.getElementById('next-page').onclick = () => { currentPage++; refreshAttendanceTable(); };
     document.getElementById('prev-page').onclick = () => { 
-        if(currentPage > 1) { 
-            currentPage--; 
-            lastVisibleStudent = null; // Basic reset logic for simplicity
-            refreshAttendanceTable(); 
-        } 
+        if(currentPage > 1) { currentPage--; lastVisibleStudent = null; refreshAttendanceTable(); } 
     };
 
-    // Auto-focus Logic (Smart Focus)
     document.addEventListener('click', (e) => {
         const isInteractive = e.target.closest('select') || e.target.closest('button') || e.target.closest('input') || e.target.closest('nav');
         if (!isInteractive && manualInput) manualInput.focus();
@@ -164,58 +146,70 @@ function setupEventListeners() {
 }
 
 /**
- * SCANNER LOGIC
+ * FIXED CAMERA LOGIC
  */
 async function toggleCameraScanner(btn) {
-    const container = document.getElementById('scanner-container');
+    const readerDiv = document.getElementById('reader');
     const placeholder = document.getElementById('camera-placeholder');
     const btnText = btn.querySelector('span');
 
     if (isScannerActive) {
-        if(html5QrCode) await html5QrCode.stop();
-        container.style.display = 'none';
+        // CLOSE CAMERA
+        try {
+            if (html5QrCode) {
+                await html5QrCode.stop();
+                html5QrCode = null; // Destroy instance
+            }
+        } catch (err) { console.error("Error stopping camera:", err); }
+        
+        readerDiv.style.display = 'none';
         placeholder.style.display = 'flex';
         btnText.innerText = "Open Camera";
-        btn.style.background = "";
+        btn.style.background = ""; // back to gold
         isScannerActive = false;
     } else {
-        container.style.display = 'block';
+        // OPEN CAMERA
+        readerDiv.style.display = 'block';
         placeholder.style.display = 'none';
-        btnText.innerText = "Close Camera";
-        btn.style.background = "#ef4444";
+        btnText.innerText = "Closing..."; // visual feedback habang naglo-load
         
-        setTimeout(() => {
+        try {
             html5QrCode = new Html5Qrcode("reader");
-            html5QrCode.start({ facingMode: "environment" }, 
-                { fps: 20, qrbox: 250 }, 
-                (decodedText) => {
-                    html5QrCode.pause();
-                    handleAttendanceInput(decodedText);
+            await html5QrCode.start(
+                { facingMode: "environment" }, 
+                { fps: 15, qrbox: { width: 250, height: 250 } }, 
+                (text) => {
+                    handleAttendanceInput(text);
+                    // Sandaling pause para hindi mag-scan ng paulit-ulit
+                    html5QrCode.pause(true);
                     setTimeout(() => html5QrCode.resume(), 3000);
                 }
-            ).catch(err => console.error(err));
+            );
+            btnText.innerText = "Close Camera";
+            btn.style.background = "#ef4444";
             isScannerActive = true;
-        }, 300);
+        } catch (err) {
+            console.error("Camera Start Error:", err);
+            Swal.fire("Camera Error", "Check permissions or if camera is used by another app.", "error");
+            readerDiv.style.display = 'none';
+            placeholder.style.display = 'flex';
+            btnText.innerText = "Open Camera";
+        }
     }
-    lucide.createIcons();
 }
 
-/**
- * ATTENDANCE LOGIC
- */
 async function handleAttendanceInput(studentId) {
     const eventId = document.getElementById('attendance-event-id').value;
-    if (!eventId) return Swal.fire('Wait!', 'Select event first.', 'warning');
+    if (!eventId) {
+        if(isScannerActive) html5QrCode.resume();
+        return Swal.fire('Wait!', 'Select event first.', 'warning');
+    }
 
     const beep = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
     const errorSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2873/2873-preview.mp3');
 
     try {
-        const [studentSnap, eventSnap] = await Promise.all([
-            getDoc(doc(db, "students", studentId)),
-            getDoc(doc(db, "events", eventId))
-        ]);
-
+        const studentSnap = await getDoc(doc(db, "students", studentId));
         if (!studentSnap.exists()) {
             updateUI("ID: " + studentId, "Student not found", "danger");
             errorSound.play();
@@ -223,10 +217,9 @@ async function handleAttendanceInput(studentId) {
         }
 
         const student = studentSnap.data();
-        const event = eventSnap.data();
+        const event = eventDataMap[eventId];
         const studentDept = classifyStudent(student.course);
 
-        // Eligibility Check
         if ((event.targetDept !== "ALL" && event.targetDept !== studentDept) || !event.targetYears.includes(student.yearLevel.toString())) {
             updateUI(student.fullName, "NOT ELIGIBLE", "danger");
             errorSound.play();
@@ -256,9 +249,6 @@ async function handleAttendanceInput(studentId) {
     } catch (err) { console.error(err); }
 }
 
-/**
- * TABLE REFRESH WITH PAGINATION
- */
 async function refreshAttendanceTable() {
     const eventId = document.getElementById('attendance-event-id').value;
     const tbody = document.getElementById('attendance-tbody');
@@ -270,7 +260,6 @@ async function refreshAttendanceTable() {
         const event = eventDataMap[eventId];
         let studentQuery = query(collection(db, "students"), orderBy("fullName"), limit(PAGE_SIZE));
 
-        // Para sa "Next" page
         if (currentPage > 1 && lastVisibleStudent) {
             studentQuery = query(collection(db, "students"), orderBy("fullName"), startAfter(lastVisibleStudent), limit(PAGE_SIZE));
         }
@@ -280,17 +269,21 @@ async function refreshAttendanceTable() {
             getDocs(query(collection(db, "attendance"), where("eventId", "==", eventId)))
         ]);
 
-        lastVisibleStudent = studentsSnap.docs[studentsSnap.docs.length - 1];
-        document.getElementById('page-num').innerText = `Pg ${currentPage}`;
-
         const logs = {};
         logsSnap.forEach(d => logs[d.data().studentId] = d.data());
 
         tbody.innerHTML = "";
+        if (studentsSnap.empty) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px;">End of list.</td></tr>`;
+            return;
+        }
+
+        lastVisibleStudent = studentsSnap.docs[studentsSnap.docs.length - 1];
+        document.getElementById('page-num').innerText = `Pg ${currentPage}`;
+
         studentsSnap.forEach(sDoc => {
             const student = sDoc.data();
             const sDept = classifyStudent(student.course);
-            
             if ((event.targetDept === "ALL" || event.targetDept === sDept) && event.targetYears.includes(student.yearLevel.toString())) {
                 const log = logs[sDoc.id];
                 tbody.innerHTML += `
