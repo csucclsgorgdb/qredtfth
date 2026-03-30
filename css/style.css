@@ -743,3 +743,51 @@ body.login-page {
     gap: 10px;
     cursor: pointer;
 }
+
+/* --- SIDEBAR TOGGLE SYSTEM --- */
+#sidebar {
+    width: 280px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+}
+
+#content {
+    margin-left: 280px;
+    width: calc(100% - 280px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Collapsed State */
+#sidebar.collapsed {
+    width: 80px;
+    min-width: 80px;
+}
+
+#sidebar.collapsed .header-text,
+#sidebar.collapsed .user-info,
+#sidebar.collapsed .nav-link span {
+    display: none; /* Prevents text overflow seen in your screenshot */
+}
+
+#sidebar.collapsed .user-profile-card,
+#sidebar.collapsed .nav-link {
+    justify-content: center;
+    padding: 12px 0;
+}
+
+#content.expanded {
+    margin-left: 80px;
+    width: calc(100% - 80px);
+}
+
+/* Sidebar Footer should always stay at bottom */
+.components {
+    flex-grow: 1;
+}
+
+.sidebar-footer {
+    border-top: 1px solid rgba(255,255,255,0.1);
+    padding-top: 15px;
+    margin-top: auto;
+}
