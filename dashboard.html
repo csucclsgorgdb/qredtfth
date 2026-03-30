@@ -12,7 +12,38 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <style>
-        /* Specific Dashboard Layout Styles */
+        /* --- SIDEBAR LAYOUT FIXES --- */
+        #sidebar {
+            height: 100vh !important; /* Force sidebar to screen height */
+            display: flex !important;
+            flex-direction: column !important;
+            overflow: hidden !important; /* Prevent total sidebar scroll */
+            position: fixed;
+            left: 0;
+            top: 0;
+        }
+
+        .components {
+            flex-grow: 1 !important; /* This section takes up extra space */
+            overflow-y: auto !important; /* ONLY this section scrolls if too long */
+            margin-bottom: 10px !important;
+            list-style: none;
+            padding: 0;
+        }
+
+        /* Slim scrollbar for the menu */
+        .components::-webkit-scrollbar { width: 4px; }
+        .components::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+
+        .sidebar-footer {
+            margin-top: auto !important; /* Pushes footer to the absolute bottom */
+            flex-shrink: 0 !important; /* Prevents footer from squishing */
+            padding-top: 15px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            background: inherit;
+        }
+
+        /* Specific Dashboard Grid Styles */
         .dashboard-grid {
             display: grid;
             grid-template-columns: 2fr 1fr;
@@ -106,7 +137,7 @@
 
             <div class="sidebar-footer">
                 <div class="admin-only">
-                    <a href="#" class="nav-link" data-module="settings" style="border-top: 1px solid rgba(255,255,255,0.1); padding-top:15px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; text-decoration: none; color: white;">
+                    <a href="#" class="nav-link" data-module="settings" style="text-decoration: none; color: white; display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
                         <i data-lucide="settings"></i> <span>Settings</span>
                     </a>
                 </div>
@@ -220,7 +251,7 @@
         toggleBtn.addEventListener('click', () => {
             sidebar.classList.toggle('collapsed');
             content.classList.toggle('expanded');
-            lucide.createIcons(); // Refresh icons for potential state changes
+            lucide.createIcons(); 
         });
 
         // Module Switcher Logic
