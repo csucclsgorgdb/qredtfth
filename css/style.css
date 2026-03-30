@@ -6,19 +6,18 @@
     --hero-navy-dark: #001129;
     --hero-navy-light: #002b66;
     --hero-gold: #ffcc00;
-    --hero-gold-glow: rgba(255, 204, 0, 0.3);
+    --hero-gold-glow: rgba(255, 204, 0, 0.4);
     --white: #ffffff;
-    --bg-body: #f8fafc;
+    --bg-body: #f4f7fa;
     --text-main: #1e293b;
     --text-muted: #64748b;
+    --border-color: #e2e8f0;
     --sidebar-width: 280px;
-    --glass: rgba(255, 255, 255, 0.05);
-    --border-glass: rgba(255, 255, 255, 0.1);
-    --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
-    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --card-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* --- 2. GLOBAL RESET --- */
+/* --- 2. GLOBAL RESET & SCROLLBAR --- */
 * {
     margin: 0;
     padding: 0;
@@ -29,12 +28,17 @@
 body {
     background-color: var(--bg-body);
     color: var(--text-main);
-    display: flex;
     min-height: 100vh;
+    display: flex;
     overflow-x: hidden;
 }
 
-/* --- 3. SIDEBAR --- */
+/* Custom Scrollbar */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: #f1f1f1; }
+::-webkit-scrollbar-thumb { background: var(--hero-navy); border-radius: 10px; }
+
+/* --- 3. SIDEBAR (FIXED LEFT) --- */
 #sidebar {
     width: var(--sidebar-width);
     background: linear-gradient(180deg, var(--hero-navy) 0%, var(--hero-navy-dark) 100%);
@@ -43,10 +47,10 @@ body {
     position: fixed;
     left: 0;
     top: 0;
-    display: flex;
-    flex-direction: column;
     padding: 24px 16px;
     z-index: 1000;
+    display: flex;
+    flex-direction: column;
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
 }
 
@@ -54,13 +58,13 @@ body {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px;
-    margin-bottom: 24px;
+    margin-bottom: 30px;
+    padding: 0 10px;
 }
 
 .logo-circle {
     background: var(--hero-gold);
-    width: 42px;
+    min-width: 42px;
     height: 42px;
     border-radius: 10px;
     display: flex;
@@ -71,7 +75,7 @@ body {
 
 .logo-icon { color: var(--hero-navy); width: 24px; height: 24px; }
 
-/* --- 4. NAVIGATION --- */
+/* Navigation Links */
 .nav-link {
     display: flex;
     align-items: center;
@@ -80,146 +84,148 @@ body {
     color: #94a3b8;
     text-decoration: none;
     border-radius: 10px;
+    margin-bottom: 6px;
     transition: var(--transition);
     font-weight: 500;
     font-size: 0.95rem;
-    margin-bottom: 4px;
 }
 
-.nav-link:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--white);
-}
+.nav-link:hover { background: rgba(255, 255, 255, 0.05); color: var(--white); }
 
 .nav-link.active {
     background: var(--hero-gold) !important;
     color: var(--hero-navy) !important;
-    font-weight: 600;
+    font-weight: 700;
     box-shadow: 0 4px 15px var(--hero-gold-glow);
 }
 
-/* --- 5. MAIN CONTENT --- */
+/* --- 4. MAIN CONTENT AREA --- */
 #content {
     margin-left: var(--sidebar-width);
     width: calc(100% - var(--sidebar-width));
     padding: 40px;
+    min-height: 100vh;
     transition: var(--transition);
 }
 
-/* --- 6. STUDENT MANAGEMENT UI ENHANCEMENTS --- */
+/* --- 5. DASHBOARD UI COMPONENTS --- */
 .module-header {
     background: var(--white);
     padding: 28px;
     border-radius: 20px;
     box-shadow: var(--card-shadow);
     margin-bottom: 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     border-left: 6px solid var(--hero-gold);
 }
 
 .search-box input {
-    transition: var(--transition);
-    border: 1px solid #e2e8f0;
+    padding: 12px 15px 12px 45px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
     background: #f8fafc;
+    width: 280px;
+    transition: var(--transition);
 }
 
 .search-box input:focus {
-    width: 320px;
-    background: var(--white);
+    width: 350px;
+    background: white;
     border-color: var(--hero-gold);
     box-shadow: 0 0 0 4px var(--hero-gold-glow);
     outline: none;
 }
 
-/* Custom Buttons */
-.btn-navy {
-    background: var(--hero-navy);
-    color: white;
+/* Buttons */
+.btn-navy, .btn-gold {
     border: none;
-    padding: 10px 20px;
+    padding: 12px 20px;
     border-radius: 12px;
     font-weight: 600;
     cursor: pointer;
-    transition: var(--transition);
     display: flex;
     align-items: center;
-    gap: 8px;
-}
-
-.btn-navy:hover { background: var(--hero-navy-light); transform: translateY(-1px); }
-
-.btn-gold {
-    background: var(--hero-gold);
-    color: var(--hero-navy);
-    border: none;
-    padding: 10px 20px;
-    border-radius: 12px;
-    font-weight: 700;
-    cursor: pointer;
+    gap: 10px;
     transition: var(--transition);
-    display: flex;
-    align-items: center;
-    gap: 8px;
 }
 
-.btn-gold:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-navy { background: var(--hero-navy); color: white; }
+.btn-navy:hover { background: var(--hero-navy-light); transform: translateY(-2px); }
 
-/* --- 7. DATA TABLE STYLING --- */
+.btn-gold { background: var(--hero-gold); color: var(--hero-navy); }
+.btn-gold:hover { transform: translateY(-2px); opacity: 0.9; }
+
+/* --- 6. DATA TABLE --- */
+.dashboard-card {
+    background: var(--white);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: var(--card-shadow);
+    border: 1px solid #f1f5f9;
+}
+
+.data-table { width: 100%; border-collapse: collapse; }
+
 .data-table th {
-    background: #f1f5f9;
-    padding: 14px 18px;
-    color: var(--text-muted);
+    background: #f8fafc;
+    padding: 16px 20px;
+    text-align: left;
     font-size: 0.75rem;
-    font-weight: 700;
+    color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    font-weight: 700;
+    border-bottom: 2px solid var(--border-color);
 }
 
 .data-table td {
-    padding: 16px 18px;
-    font-size: 0.9rem;
-    color: var(--text-main);
+    padding: 18px 20px;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.95rem;
 }
 
-.data-table tr:hover {
-    background-color: #f8fafc;
-}
+.data-table tr:hover { background: #fcfcfc; }
 
 .badge {
-    padding: 4px 10px;
-    border-radius: 6px;
+    padding: 5px 12px;
+    border-radius: 8px;
     font-size: 0.75rem;
     font-weight: 700;
-    display: inline-block;
+    background: #f1f5f9;
+    color: var(--hero-navy);
+    border: 1px solid var(--border-color);
 }
 
-/* --- 8. SKELETON LOADING EFFECTS --- */
+/* --- 7. SKELETON / SHIMMER --- */
 .shimmer {
     height: 20px;
-    background: #f1f5f9;
-    background-image: linear-gradient(to right, #f1f5f9 0%, #e2e8f0 20%, #f1f5f9 40%, #f1f5f9 100%);
-    background-repeat: no-repeat;
-    background-size: 800px 100%;
-    display: inline-block;
-    position: relative;
-    animation: shimmer 1.5s infinite linear;
+    background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
     border-radius: 4px;
-    width: 100%;
 }
 
 @keyframes shimmer {
-    0% { background-position: -468px 0; }
-    100% { background-position: 468px 0; }
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
 }
 
-/* --- 9. PAGINATION --- */
-.nav-btn {
-    width: 40px;
-    height: 40px;
+/* --- 8. PAGINATION --- */
+.pagination-container {
     display: flex;
-    align-items: center;
     justify-content: center;
-    border-radius: 10px;
-    border: 1px solid #e2e8f0;
+    align-items: center;
+    gap: 12px;
+    margin-top: 30px;
+}
+
+.nav-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
     background: white;
     cursor: pointer;
     transition: var(--transition);
@@ -230,17 +236,10 @@ body {
     border-color: var(--hero-gold);
 }
 
-.nav-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
-
-/* --- 10. RESPONSIVE --- */
+/* --- 9. RESPONSIVE --- */
 @media (max-width: 1024px) {
     #sidebar { width: 85px; padding: 20px 10px; }
-    #sidebar .header-text, 
-    #sidebar .nav-link span, 
-    #sidebar .user-info { display: none; }
-    #content { margin-left: 85px; width: calc(100% - 85px); padding: 25px; }
-    .nav-link { justify-content: center; }
+    #sidebar span, #sidebar .header-text, #sidebar .user-info { display: none; }
+    #content { margin-left: 85px; width: calc(100% - 85px); }
+    .nav-link { justify-content: center; padding: 15px; }
 }
