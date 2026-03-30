@@ -3,18 +3,23 @@ import {
     collection, doc, getDoc, getDocs, setDoc, updateDoc, query, where, serverTimestamp, limit, startAfter, orderBy, onSnapshot 
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
+/**
+ * GLOBAL STATES
+ */
 let html5QrCode = null;
 let eventDataMap = {};
 let isScannerActive = false;
 let unsubscribeAttendance = null;
-
-// Pagination State
 let lastVisibleStudent = null;
 let currentPage = 1;
 const PAGE_SIZE = 20; 
 
+// Sounds for Feedback
+const audioSuccess = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+const audioError = new Audio('https://assets.mixkit.co/active_storage/sfx/2873/2873-preview.mp3');
+
 /**
- * DYNAMIC CLASSIFICATION
+ * HELPER: CLASSIFY STUDENT BY COURSE
  */
 function classifyStudent(course) {
     if (!course) return "Other";
@@ -25,86 +30,97 @@ function classifyStudent(course) {
 }
 
 /**
- * INITIALIZE ATTENDANCE MODULE
+ * MAIN: INITIALIZE MODULE
  */
 export async function initAttendance() {
     const container = document.getElementById('module-container');
     
-    // Fetch only Ongoing Events
-    const q = query(collection(db, "events"), where("status", "==", "Ongoing"));
-    const eventSnap = await getDocs(q);
-    
-    let eventOptions = eventSnap.docs.map(d => {
-        eventDataMap[d.id] = d.data();
-        return `<option value="${d.id}">${d.data().name}</option>`;
-    }).join('');
-
+    // UI Skeleton - Navy Blue & Golden Yellow Branding
     container.innerHTML = `
-        <div class="module-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; padding:0 10px;">
+        <style>
+            :root { --hero-navy: #000080; --hero-gold: #FFD700; }
+            .attendance-grid { display: grid; grid-template-columns: 400px 1fr; gap: 20px; padding: 15px; }
+            .scanner-card { background: #0f172a; border-radius: 20px; overflow: hidden; border: 4px solid #1e293b; position: relative; }
+            #reader { width: 100% !important; border: none !important; }
+            #reader__dashboard_section_csr button { background: var(--hero-gold) !important; color: black !important; border-radius: 8px !important; }
+            .data-table thead tr { background: var(--hero-navy); color: white; position: sticky; top: 0; }
+            .status-badge { padding: 4px 8px; border-radius: 6px; font-weight: 800; font-size: 10px; }
+            .btn-action { height: 45px; border-radius: 10px; font-weight: 700; transition: 0.3s; cursor: pointer; border: none; }
+            .spin { animation: spin 2s linear infinite; }
+            @keyframes spin { 100% { transform: rotate(360deg); } }
+            @media (max-width: 900px) { .attendance-grid { grid-template-columns: 1fr; } }
+        </style>
+
+        <div class="module-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; background: white; padding: 15px; border-radius: 15px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
             <div>
-                <h1 style="color:var(--hero-navy); font-weight:800; margin:0;">Attendance Management</h1>
-                <p style="margin:0; font-size:12px; color:#64748b;">Automated Participant Filtering Active</p>
+                <h1 style="color:var(--hero-navy); font-weight:900; margin:0; font-size: 24px;">Attendance System</h1>
+                <p style="margin:0; font-size:12px; color: #64748b; font-weight: 600;">Event-Based Participant Validation</p>
             </div>
-            <div style="display:flex; gap:10px; align-items:center;">
-                <select id="attendance-event-id" class="swal2-input" style="margin:0; width:220px; height:45px; font-size:13px; border-radius:10px;">
-                    <option value="">-- Select Event --</option>
-                    ${eventOptions}
+            <div style="display:flex; gap:12px; align-items:center;">
+                <select id="attendance-event-id" class="swal2-input" style="margin:0; width:250px; height:45px; font-size:14px; border: 2px solid #e2e8f0;">
+                    <option value="">-- Loading Events... --</option>
                 </select>
-                <button id="btn-toggle-camera" class="btn-gold" style="height:45px; width:160px; border-radius:10px; font-weight:700;">
+                <button id="btn-toggle-camera" class="btn-action" style="background: var(--hero-navy); color: white; width: 180px;">
                     <i data-lucide="camera"></i> <span>Open Camera</span>
                 </button>
             </div>
         </div>
 
-        <div class="dashboard-grid" style="display: grid; grid-template-columns: 1fr 1.8fr; gap:15px; padding:0 10px;">
+        <div class="attendance-grid">
             <div style="display:flex; flex-direction:column; gap:15px;">
-                <div class="dashboard-card" style="padding:10px; background:#0f172a; border-radius:20px; min-height:280px; position:relative; overflow:hidden; border:4px solid #1e293b;">
-                    <div id="reader" style="width:100%; display:none;"></div>
-                    <div id="camera-placeholder" style="width:100%; height:280px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#475569;">
-                        <i data-lucide="aperture" class="spin" style="width:50px; height:50px; opacity:0.3;"></i>
-                        <p style="font-size:12px; font-weight:600; margin-top:10px;">SCANNER READY</p>
+                <div class="scanner-card">
+                    <div id="reader" style="display:none;"></div>
+                    <div id="camera-placeholder" style="height:300px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#475569; background: #0f172a;">
+                        <i data-lucide="aperture" class="spin" style="width:60px; height:60px; opacity:0.2;"></i>
+                        <p style="margin-top:15px; font-weight:700; letter-spacing:1px; font-size:11px;">READY TO INITIALIZE</p>
                     </div>
                 </div>
 
-                <div id="scan-feedback" class="dashboard-card" style="text-align:center; transition: 0.3s ease; border:2px solid #e2e8f0; min-height:120px; display:flex; flex-direction:column; justify-content:center;">
-                    <h2 id="scan-id" style="margin:0; color:var(--hero-navy); font-weight:900; font-size:1.4rem;">READY</h2>
-                    <p id="scan-status" style="margin:5px 0 0 0; font-weight:700; font-size:0.9rem; color:#64748b;">Waiting for Student...</p>
+                <div id="scan-feedback" style="background: white; padding: 20px; border-radius: 20px; text-align: center; border: 2px solid #f1f5f9; min-height: 140px; display: flex; flex-direction: column; justify-content: center;">
+                    <h2 id="scan-id" style="margin:0; color:var(--hero-navy); font-weight:900; font-size: 1.6rem;">---</h2>
+                    <p id="scan-status" style="margin:5px 0 0 0; font-weight:700; color:#94a3b8; text-transform: uppercase; font-size: 11px;">Waiting for scan...</p>
                 </div>
 
-                <div class="dashboard-card" style="padding:15px; border-bottom: 5px solid var(--hero-gold);">
-                    <div style="display:flex; gap:8px;">
-                        <input type="text" id="manual-input" class="swal2-input" placeholder="Enter ID Number..." style="margin:0; flex:1; height:50px; text-align:center; font-weight:800; border:2px solid #cbd5e1; border-radius:12px;">
-                        <button id="btn-manual-submit" class="btn-gold" style="width:60px; height:50px; border-radius:12px;"><i data-lucide="arrow-right"></i></button>
+                <div style="background: white; padding: 15px; border-radius: 20px; border-bottom: 6px solid var(--hero-gold);">
+                    <label style="display:block; font-size: 10px; font-weight: 800; color: var(--hero-navy); margin-bottom: 5px; margin-left: 5px;">MANUAL OVERRIDE / BARCODE GUN</label>
+                    <div style="display:flex; gap:10px;">
+                        <input type="text" id="manual-input" placeholder="Enter ID..." style="flex:1; height:50px; border-radius: 12px; border: 2px solid #e2e8f0; text-align: center; font-weight: 800; font-size: 18px;">
+                        <button id="btn-manual-submit" class="btn-action" style="background: var(--hero-gold); color: black; width: 60px;">
+                            <i data-lucide="send"></i>
+                        </button>
                     </div>
                 </div>
             </div>
 
-            <div class="dashboard-card" style="padding:15px;">
+            <div style="background: white; border-radius: 20px; padding: 20px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                    <h3 style="margin:0; font-size:15px;"><i data-lucide="clipboard-check"></i> Live Participant List</h3>
+                    <h3 style="margin:0; font-size: 16px; color: var(--hero-navy); font-weight: 800;">
+                        <i data-lucide="users" style="vertical-align: middle; margin-right: 5px;"></i> Participant Monitor
+                    </h3>
                     <div style="display:flex; gap:10px;">
-                        <button id="btn-export-csv" class="btn-gold" style="padding:0 15px; height:32px; font-size:11px;">CSV Export</button>
-                        <div style="display:flex; gap:4px; background:#f1f5f9; padding:4px; border-radius:10px;">
-                            <button id="prev-page" class="btn-gold" style="padding:0 10px; height:32px;"><</button>
-                            <span id="page-num" style="font-size:12px; font-weight:800; min-width:45px; text-align:center; line-height:32px;">Pg 1</span>
-                            <button id="next-page" class="btn-gold" style="padding:0 10px; height:32px;">></button>
+                        <button id="btn-export-csv" class="btn-action" style="background: #f1f5f9; color: #475569; padding: 0 15px; font-size: 12px; height: 35px;">Export CSV</button>
+                        <div style="display:flex; align-items:center; background:#f8fafc; border-radius:10px; padding: 2px 8px; border: 1px solid #e2e8f0;">
+                            <button id="prev-page" style="border:none; background:none; cursor:pointer; padding: 5px;"><i data-lucide="chevron-left" style="width:18px;"></i></button>
+                            <span id="page-num" style="font-weight:900; font-size:12px; margin: 0 10px;">PAGE 1</span>
+                            <button id="next-page" style="border:none; background:none; cursor:pointer; padding: 5px;"><i data-lucide="chevron-right" style="width:18px;"></i></button>
                         </div>
                     </div>
                 </div>
-                <div class="data-table-container" style="max-height: 550px; overflow-y:auto; border-radius:10px;">
-                    <table class="data-table" style="font-size:11px; width:100%;">
+                
+                <div style="overflow-x:auto; max-height: 550px;">
+                    <table class="data-table" style="width:100%; border-collapse: collapse; font-size: 12px;">
                         <thead>
-                            <tr style="background: var(--hero-navy); color: white;">
-                                <th>STUDENT NAME</th>
+                            <tr style="text-align: left;">
+                                <th style="padding:15px;">STUDENT NAME</th>
                                 <th>ID & DEPT</th>
-                                <th>COURSE/YR</th>
+                                <th>COURSE & YEAR</th>
                                 <th>TIME IN</th>
                                 <th>TIME OUT</th>
                                 <th>STATUS</th>
                             </tr>
                         </thead>
                         <tbody id="attendance-tbody">
-                            <tr><td colspan="6" style="text-align:center; padding:50px; color:#94a3b8;">Select an event.</td></tr>
+                            <tr><td colspan="6" style="text-align:center; padding:100px; color:#94a3b8; font-weight: 600;">Please select an event to display participants.</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -112,95 +128,223 @@ export async function initAttendance() {
         </div>
     `;
 
-    setupEventListeners();
+    loadOngoingEvents();
+    setupCoreListeners();
     lucide.createIcons();
 }
 
-function setupEventListeners() {
-    const manualInput = document.getElementById('manual-input');
-    const eventSelect = document.getElementById('attendance-event-id');
-
-    const triggerSubmit = () => {
-        const val = manualInput.value.trim();
-        if (val) { handleAttendanceInput(val); manualInput.value = ""; }
-    };
-
-    manualInput.onkeypress = (e) => { if (e.key === 'Enter') triggerSubmit(); };
-    document.getElementById('btn-manual-submit').onclick = triggerSubmit;
-    document.getElementById('btn-toggle-camera').onclick = (e) => toggleCameraScanner(e.currentTarget);
-    document.getElementById('btn-export-csv').onclick = exportToCSV;
-    
-    eventSelect.onchange = () => {
-        currentPage = 1;
-        lastVisibleStudent = null;
-        refreshAttendanceTable();
-    };
-
-    document.getElementById('next-page').onclick = () => { currentPage++; refreshAttendanceTable(); };
-    document.getElementById('prev-page').onclick = () => { if(currentPage > 1) { currentPage--; lastVisibleStudent = null; refreshAttendanceTable(); } };
-
-    document.addEventListener('keydown', (e) => {
-        if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'SELECT') {
-            manualInput.focus();
+/**
+ * CORE LOGIC: FETCH EVENTS
+ */
+async function loadOngoingEvents() {
+    const sel = document.getElementById('attendance-event-id');
+    try {
+        const q = query(collection(db, "events"), where("status", "==", "Ongoing"));
+        const snap = await getDocs(q);
+        
+        if(snap.empty) {
+            sel.innerHTML = `<option value="">No Ongoing Events</option>`;
+            return;
         }
-    });
+
+        let options = `<option value="">-- Choose Event --</option>`;
+        snap.forEach(doc => {
+            eventDataMap[doc.id] = doc.data();
+            options += `<option value="${doc.id}">${doc.data().name}</option>`;
+        });
+        sel.innerHTML = options;
+    } catch (e) { console.error("Event Load Error:", e); }
 }
 
 /**
- * CAMERA FIX: CLEARING INSTANCES FOR ANDROID
+ * CAMERA LIFECYCLE: THE 500-LINE FIX
  */
 async function toggleCameraScanner(btn) {
-    const reader = document.getElementById('reader');
+    const readerDiv = document.getElementById('reader');
     const ph = document.getElementById('camera-placeholder');
-    const span = btn.querySelector('span');
+    const btnSpan = btn.querySelector('span');
 
+    // IF ACTIVE: SHUTDOWN EVERYTHING
     if (isScannerActive) {
+        btnSpan.innerText = "Closing...";
         if (html5QrCode) {
             try {
                 await html5QrCode.stop();
                 await html5QrCode.clear();
-            } catch (e) { console.warn(e); }
+            } catch (err) { console.warn("Cleanup Warning:", err); }
             html5QrCode = null;
         }
-        reader.style.display = 'none';
+        readerDiv.style.display = 'none';
+        readerDiv.innerHTML = ""; // Hard reset
         ph.style.display = 'flex';
-        span.innerText = "Open Camera";
-        btn.style.background = "";
+        btn.style.background = "var(--hero-navy)";
+        btnSpan.innerText = "Open Camera";
         isScannerActive = false;
-    } else {
-        reader.innerHTML = ""; // Clear existing elements
-        reader.style.display = 'block';
+    } 
+    // IF INACTIVE: INITIALIZE WITH ANDROID PRE-CHECK
+    else {
+        btnSpan.innerText = "Initializing...";
+        readerDiv.style.display = 'block';
         ph.style.display = 'none';
-        span.innerText = "Starting...";
 
         try {
-            await Html5Qrcode.getCameras(); // Permission Ping
-            html5QrCode = new Html5Qrcode("reader");
+            // Check for camera hardware availability first
+            const devices = await Html5Qrcode.getCameras();
+            if (!devices || devices.length === 0) {
+                throw new Error("No camera hardware detected.");
+            }
+
+            html5QrCode = new Html5Qrcode("reader", { verbose: false });
+            
+            const qrConfig = {
+                fps: 25,
+                qrbox: { width: 250, height: 250 },
+                aspectRatio: 1.0
+            };
+
             await html5QrCode.start(
                 { facingMode: "environment" }, 
-                { fps: 20, qrbox: { width: 250, height: 250 } }, 
-                (text) => {
-                    handleAttendanceInput(text);
+                qrConfig,
+                (decodedText) => {
+                    handleAttendanceInput(decodedText);
+                    // Pause for UX stability on mobile
                     html5QrCode.pause(true);
-                    setTimeout(() => { if(html5QrCode) html5QrCode.resume(); }, 2500);
+                    setTimeout(() => { if(html5QrCode) html5QrCode.resume(); }, 3000);
                 }
             );
-            span.innerText = "Close Camera";
-            btn.style.background = "#ef4444";
+
+            btn.style.background = "#ef4444"; // Red for "Close"
+            btnSpan.innerText = "Close Camera";
             isScannerActive = true;
         } catch (err) {
-            console.error(err);
-            Swal.fire("Camera Error", "Blocked by browser or busy. Refresh page.", "error");
-            reader.style.display = 'none';
-            ph.style.display = 'flex';
-            span.innerText = "Open Camera";
+            console.error("Critical Scanner Error:", err);
             isScannerActive = false;
+            readerDiv.style.display = 'none';
+            ph.style.display = 'flex';
+            btnSpan.innerText = "Open Camera";
+            
+            Swal.fire({
+                title: "Scanner Locked",
+                text: "Android blocked the camera. Please ensure no other app is using it and refresh.",
+                icon: "error",
+                background: "#fff",
+                confirmButtonColor: "#000080"
+            });
         }
     }
 }
 
 /**
- * REFRESH TABLE: LIVE LISTENING + DEPT FILTERING
+ * ATTENDANCE HANDLER: VALIDATION & FIRESTORE
+ */
+async function handleAttendanceInput(id) {
+    const eventId = document.getElementById('attendance-event-id').value;
+    if (!eventId) {
+        Swal.fire("Attention", "Select an ongoing event first.", "warning");
+        return;
+    }
+
+    const cleanId = id.trim();
+    if (!cleanId) return;
+
+    try {
+        const studentDoc = await getDoc(doc(db, "students", cleanId));
+        if (!studentDoc.exists()) {
+            updateUIFeedback("ID NOT FOUND", `ID: ${cleanId}`, "danger");
+            audioError.play();
+            return;
+        }
+
+        const student = studentDoc.data();
+        const event = eventDataMap[eventId];
+        const studentDept = classifyStudent(student.course);
+
+        // Eligibility Check (Consolidated logic)
+        const isEligibleDept = (event.targetDept === "ALL" || event.targetDept === studentDept);
+        const isEligibleYear = event.targetYears.includes(student.yearLevel.toString());
+
+        if (!isEligibleDept || !isEligibleYear) {
+            updateUIFeedback(student.fullName, "NOT ELIGIBLE FOR THIS EVENT", "danger");
+            audioError.play();
+            return;
+        }
+
+        // Attendance Record Transaction
+        const attendRef = doc(db, "attendance", `${eventId}_${cleanId}`);
+        const attendSnap = await getDoc(attendRef);
+        const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+
+        if (!attendSnap.exists()) {
+            // TIME IN
+            await setDoc(attendRef, {
+                studentId: cleanId,
+                studentName: student.fullName,
+                courseYear: `${student.course} - ${student.yearLevel}`,
+                classification: studentDept,
+                eventId: eventId,
+                eventName: event.name,
+                timeIn: timeNow,
+                timeOut: null,
+                status: "In Venue",
+                timestamp: serverTimestamp()
+            });
+            updateUIFeedback(student.fullName, "TIME IN SUCCESSFUL", "success");
+            audioSuccess.play();
+        } else {
+            const data = attendSnap.data();
+            if (data.status === "In Venue") {
+                // TIME OUT
+                await updateDoc(attendRef, {
+                    timeOut: timeNow,
+                    status: "Present"
+                });
+                updateUIFeedback(student.fullName, "TIME OUT SUCCESSFUL", "info");
+                audioSuccess.play();
+            } else {
+                updateUIFeedback(student.fullName, "ALREADY COMPLETED", "warning");
+            }
+        }
+    } catch (err) {
+        console.error("Firestore Error:", err);
+    }
+}
+
+/**
+ * UI FEEDBACK HELPER
+ */
+function updateUIFeedback(name, status, type) {
+    const box = document.getElementById('scan-feedback');
+    const idH = document.getElementById('scan-id');
+    const stP = document.getElementById('scan-status');
+
+    const colors = {
+        success: { bg: '#dcfce7', text: '#16a34a', border: '#bbf7d0' },
+        info: { bg: '#dbeafe', text: '#2563eb', border: '#bfdbfe' },
+        warning: { bg: '#fef9c3', text: '#ca8a04', border: '#fef08a' },
+        danger: { bg: '#fee2e2', text: '#dc2626', border: '#fecaca' }
+    };
+
+    const theme = colors[type];
+    box.style.background = theme.bg;
+    box.style.borderColor = theme.border;
+    idH.innerText = name;
+    idH.style.color = theme.text;
+    stP.innerText = status;
+    stP.style.color = theme.text;
+
+    // Reset after 4 seconds
+    setTimeout(() => {
+        box.style.background = "white";
+        box.style.borderColor = "#f1f5f9";
+        idH.innerText = "---";
+        idH.style.color = "var(--hero-navy)";
+        stP.innerText = "Waiting for scan...";
+        stP.style.color = "#94a3b8";
+    }, 4000);
+}
+
+/**
+ * LIVE DATA TABLE: REFRESH & LISTEN
  */
 async function refreshAttendanceTable() {
     const eventId = document.getElementById('attendance-event-id').value;
@@ -208,127 +352,137 @@ async function refreshAttendanceTable() {
     if (!eventId) return;
 
     if (unsubscribeAttendance) unsubscribeAttendance();
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px;">Filtering Participants...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:40px;">Refreshing list...</td></tr>`;
 
     try {
         const event = eventDataMap[eventId];
-        let studentQuery = query(collection(db, "students"), orderBy("fullName"), limit(PAGE_SIZE));
+        
+        // 1. Get Base Students Query (with Pagination)
+        let studentQ = query(collection(db, "students"), orderBy("fullName"), limit(PAGE_SIZE));
         if (currentPage > 1 && lastVisibleStudent) {
-            studentQuery = query(collection(db, "students"), orderBy("fullName"), startAfter(lastVisibleStudent), limit(PAGE_SIZE));
+            studentQ = query(collection(db, "students"), orderBy("fullName"), startAfter(lastVisibleStudent), limit(PAGE_SIZE));
         }
 
-        const studentsSnap = await getDocs(studentQuery);
-        if (studentsSnap.empty) {
-            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px;">No students found.</td></tr>`;
+        const studentDocs = await getDocs(studentQ);
+        if (studentDocs.empty) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:40px;">No more students.</td></tr>`;
             return;
         }
 
-        lastVisibleStudent = studentsSnap.docs[studentsSnap.docs.length - 1];
-        document.getElementById('page-num').innerText = `Pg ${currentPage}`;
+        lastVisibleStudent = studentDocs.docs[studentDocs.docs.length - 1];
+        document.getElementById('page-num').innerText = `PAGE ${currentPage}`;
 
-        const attendanceQuery = query(collection(db, "attendance"), where("eventId", "==", eventId));
-        unsubscribeAttendance = onSnapshot(attendanceQuery, (snap) => {
-            const currentLogs = {};
-            snap.forEach(d => currentLogs[d.data().studentId] = d.data());
+        // 2. Real-time Listener for Attendance logs
+        const attQ = query(collection(db, "attendance"), where("eventId", "==", eventId));
+        unsubscribeAttendance = onSnapshot(attQ, (snap) => {
+            const logMap = {};
+            snap.forEach(d => logMap[d.data().studentId] = d.data());
 
             tbody.innerHTML = "";
-            let matchInPage = 0;
+            let count = 0;
 
-            studentsSnap.forEach(sDoc => {
+            studentDocs.forEach(sDoc => {
                 const s = sDoc.data();
                 const dept = classifyStudent(s.course);
+                
+                // Filtering
                 const isDeptMatch = (event.targetDept === "ALL" || event.targetDept === dept);
                 const isYearMatch = event.targetYears.includes(s.yearLevel.toString());
 
                 if (isDeptMatch && isYearMatch) {
-                    const log = currentLogs[sDoc.id];
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td style="font-weight:700;">${s.fullName}</td>
-                        <td>${sDoc.id}<br><small style="color:#64748b">${dept}</small></td>
-                        <td>${s.course} - ${s.yearLevel}</td>
-                        <td style="font-family:monospace; font-weight:bold;">${log ? log.timeIn : '--:--'}</td>
-                        <td style="font-family:monospace; font-weight:bold;">${log ? (log.timeOut || '--:--') : '--:--'}</td>
-                        <td>${log ? `<span style="color:#16a34a; font-weight:800;">${log.status.toUpperCase()}</span>` : `<span style="color:#ef4444; font-weight:800;">ABSENT</span>`}</td>
+                    const log = logMap[sDoc.id];
+                    const statusText = log ? log.status : "Absent";
+                    const statusColor = log ? (log.status === "Present" ? "#16a34a" : "#ca8a04") : "#ef4444";
+
+                    tbody.innerHTML += `
+                        <tr style="border-bottom: 1px solid #f1f5f9;">
+                            <td style="padding:15px; font-weight:700;">${s.fullName}</td>
+                            <td><span style="font-weight:600;">${sDoc.id}</span><br><small style="color:#64748b">${dept}</small></td>
+                            <td>${s.course} - Year ${s.yearLevel}</td>
+                            <td style="font-family:monospace; font-weight:700;">${log ? log.timeIn : '--:--'}</td>
+                            <td style="font-family:monospace; font-weight:700;">${log ? (log.timeOut || '--:--') : '--:--'}</td>
+                            <td>
+                                <span class="status-badge" style="background:${statusColor}15; color:${statusColor}; border:1px solid ${statusColor}30">
+                                    ${statusText.toUpperCase()}
+                                </span>
+                            </td>
+                        </tr>
                     `;
-                    tbody.appendChild(tr);
-                    matchInPage++;
+                    count++;
                 }
             });
 
-            if(matchInPage === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px; color:#94a3b8;">No matching participants on this page. Try Next.</td></tr>`;
+            if(count === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:40px; color:#94a3b8;">No matching students on this page.</td></tr>`;
             }
         });
-    } catch (err) { console.error("Table Error:", err); }
+    } catch (e) { console.error("Table Refresh Error:", e); }
 }
 
 /**
- * ATTENDANCE HANDLER (SCAN/MANUAL)
+ * EVENT LISTENERS
  */
-async function handleAttendanceInput(studentId) {
-    const eventId = document.getElementById('attendance-event-id').value;
-    if (!eventId) return Swal.fire("Required", "Select an event first.", "warning");
+function setupCoreListeners() {
+    const input = document.getElementById('manual-input');
+    const btnSubmit = document.getElementById('btn-manual-submit');
+    const eventSel = document.getElementById('attendance-event-id');
 
-    const beep = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-    const errorSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2873/2873-preview.mp3');
-
-    try {
-        const studentSnap = await getDoc(doc(db, "students", studentId));
-        if (!studentSnap.exists()) {
-            updateUI("UNKNOWN ID", "NOT FOUND", "danger");
-            errorSound.play();
-            return;
+    const handleManual = () => {
+        if(input.value.trim()) {
+            handleAttendanceInput(input.value.trim());
+            input.value = "";
         }
+    };
 
-        const student = studentSnap.data();
-        const event = eventDataMap[eventId];
-        const dept = classifyStudent(student.course);
+    input.onkeypress = (e) => { if(e.key === 'Enter') handleManual(); };
+    btnSubmit.onclick = handleManual;
+    document.getElementById('btn-toggle-camera').onclick = (e) => toggleCameraScanner(e.currentTarget);
+    document.getElementById('btn-export-csv').onclick = exportToCSV;
+    
+    eventSel.onchange = () => {
+        currentPage = 1;
+        lastVisibleStudent = null;
+        refreshAttendanceTable();
+    };
 
-        if ((event.targetDept !== "ALL" && event.targetDept !== dept) || !event.targetYears.includes(student.yearLevel.toString())) {
-            updateUI(student.fullName, "NOT ELIGIBLE", "danger");
-            errorSound.play();
-            return;
+    document.getElementById('next-page').onclick = () => { currentPage++; refreshAttendanceTable(); };
+    document.getElementById('prev-page').onclick = () => { 
+        if(currentPage > 1) { currentPage--; lastVisibleStudent = null; refreshAttendanceTable(); } 
+    };
+
+    // Auto-focus manual input unless typing in other inputs
+    document.addEventListener('keydown', (e) => {
+        if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'SELECT') {
+            input.focus();
         }
-
-        const attendRef = doc(db, "attendance", `${eventId}_${studentId}`);
-        const attendSnap = await getDoc(attendRef);
-        const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-
-        if (!attendSnap.exists()) {
-            await setDoc(attendRef, {
-                studentId, studentName: student.fullName, classification: dept,
-                eventId, eventName: event.name, timeIn: now, status: "In Venue", timestamp: serverTimestamp()
-            });
-            updateUI(student.fullName, "CHECK-IN OK", "success");
-        } else if (attendSnap.data().status === "In Venue") {
-            await updateDoc(attendRef, { timeOut: now, status: "Present" });
-            updateUI(student.fullName, "CHECK-OUT OK", "info");
-        } else {
-            updateUI(student.fullName, "ALREADY LOGGED", "warning");
-        }
-        beep.play();
-    } catch (err) { console.error("Logging Error:", err); }
+    });
 }
 
-function updateUI(name, status, type) {
-    const idEl = document.getElementById('scan-id'), stEl = document.getElementById('scan-status'), box = document.getElementById('scan-feedback');
-    const theme = { success: '#dcfce7', info: '#dbeafe', warning: '#fef9c3', danger: '#fee2e2' };
-    idEl.innerText = name; stEl.innerText = status;
-    box.style.background = theme[type];
-    setTimeout(() => { idEl.innerText = "READY"; stEl.innerText = "Waiting for Student..."; box.style.background = "white"; }, 3000);
-}
-
+/**
+ * EXPORT CSV
+ */
 async function exportToCSV() {
     const eventId = document.getElementById('attendance-event-id').value;
-    if(!eventId) return;
-    const snap = await getDocs(query(collection(db, "attendance"), where("eventId", "==", eventId)));
-    let csv = "ID,Name,Dept,In,Out,Status\n";
-    snap.forEach(d => {
-        const v = d.data();
-        csv += `"${v.studentId}","${v.studentName}","${v.classification}","${v.timeIn}","${v.timeOut || ''}","${v.status}"\n`;
-    });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    link.download = `Attendance_Report.csv`; link.click();
+    if(!eventId) return Swal.fire("Export", "Please select an event first.", "info");
+
+    try {
+        const q = query(collection(db, "attendance"), where("eventId", "==", eventId));
+        const snap = await getDocs(q);
+        
+        let csv = "ID,Name,Dept,Course_Year,Time_In,Time_Out,Status\n";
+        snap.forEach(doc => {
+            const v = doc.data();
+            csv += `"${v.studentId}","${v.studentName}","${v.classification}","${v.courseYear}","${v.timeIn}","${v.timeOut || ''}","${v.status}"\n`;
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.setAttribute('hidden', '');
+        a.setAttribute('href', url);
+        a.setAttribute('download', `Attendance_${eventDataMap[eventId].name}_${new Date().toLocaleDateString()}.csv`);
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    } catch (e) { console.error("CSV Error:", e); }
 }
