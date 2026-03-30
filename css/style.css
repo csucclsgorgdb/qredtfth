@@ -285,3 +285,54 @@ body.login-page { background: linear-gradient(135deg, var(--hero-navy-dark) 0%, 
     .login-card { margin: 20px; padding: 30px 20px; }
     .stats-row { grid-template-columns: 1fr; }
 }
+
+/* --- 3. SIDEBAR (HERO NAVY/GOLD) --- */
+#sidebar {
+    width: var(--sidebar-width) !important;
+    min-width: var(--sidebar-width);
+    background: linear-gradient(180deg, var(--hero-navy) 0%, var(--hero-navy-dark) 100%);
+    color: var(--white);
+    
+    /* FIX: Lock the sidebar to the screen height */
+    height: 100vh; 
+    position: fixed;
+    left: 0; 
+    top: 0;
+    
+    padding: 24px 16px;
+    z-index: 1000;
+    
+    /* FIX: This creates a top, middle, and bottom layout */
+    display: flex;
+    flex-direction: column; 
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
+    transition: var(--transition);
+}
+
+/* --- MAIN NAVIGATION (MIDDLE) --- */
+.components {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0;
+    
+    /* FIX: This pushes the footer to the absolute bottom */
+    flex-grow: 1; 
+    
+    /* FIX: Allows only this section to scroll if you add more links */
+    overflow-y: auto; 
+    overflow-x: hidden;
+}
+
+/* Custom scrollbar for the menu so it looks clean */
+.components::-webkit-scrollbar { width: 4px; }
+.components::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+
+/* --- SIDEBAR FOOTER (BOTTOM) --- */
+.sidebar-footer {
+    padding-top: 15px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    
+    /* FIX: Prevents the footer from disappearing or shrinking */
+    flex-shrink: 0; 
+    margin-top: auto;
+}
