@@ -1,18 +1,38 @@
-import { dbRequest } from '../app.js';
+import { db } from './firebase-config.js';
+import { 
+    collection, query, orderBy, limit, startAfter, getDocs, doc, writeBatch, where, deleteDoc, getDoc, updateDoc 
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // Pagination & Search State
-let currentPage = 1;
+let pageStack = []; 
+let currentPage = 0;
+let lastVisible = null; 
+const PAGE_SIZE = 25;
 let currentSearch = "";
 
 /**
  * HELPER: CLASSIFICATION LOGIC
+ * Automates the labeling of students based on their course/program.
  */
 function getClassification(program) {
     if (!program) return "UNCLASSIFIED";
     const p = program.toUpperCase();
-    if (p.includes("BTLED") || p.includes("BTVTED")) return "EDUCATION STUDENT";
-    if (p.includes("BSINDUSTECH")) return "INDUSTRIAL TECHNOLOGY STUDENT";
+    if (p.includes("BTLED") || p.includes("BTVTED")) {
+        return "EDUCATION STUDENT";
+    } else if (p.includes("BSINDUSTECH")) {
+        return "INDUSTRIAL TECHNOLOGY STUDENT";
+    }
     return "OTHER DEPARTMENT";
+}
+
+/**
+ * SECURITY: SANITIZATION
+ */
+function sanitize(str) {
+    if (!str) return "";
+    const temp = document.createElement('div');
+    temp.textContent = String(str);
+    return temp.innerHTML;
 }
 
 /**
@@ -25,48 +45,60 @@ export async function initStudents() {
         <div class="module-header" style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:30px;">
             <div>
                 <h1 class="module-title" style="font-weight:800; color:var(--hero-navy);">Student Management</h1>
-                <p class="module-subtitle">Manage records via Google Sheets Database.</p>
+                <p class="module-subtitle">Manage records for Education and Industrial Technology Departments.</p>
             </div>
             <div style="display:flex; gap:12px;">
                 <div class="search-box" style="position:relative;">
-                    <input type="text" id="student-search" placeholder="Search name or ID..." style="padding:10px 15px; width:250px; border-radius:10px; border:1px solid #e2e8f0; height:40px;">
+                    <i data-lucide="search" style="position:absolute; left:12px; top:10px; width:16px; color:var(--text-muted);"></i>
+                    <input type="text" id="student-search" placeholder="Search full name..." style="padding-left:40px; width:250px; border-radius:10px; border:1px solid #e2e8f0; height:40px;">
                 </div>
-                <button class="btn-gold" id="btn-add-manual" style="padding:0 20px; border-radius:8px; border:none; background:var(--hero-gold); color:var(--hero-navy); font-weight:800; cursor:pointer;">
-                    + Add Student
-                </button>
+                
+                <input type="file" id="file-import" accept=".csv, .xlsx, .xls" style="display:none">
+                
+                <button class="btn-navy" id="btn-import-trigger"><i data-lucide="file-up"></i> Bulk Import</button>
+                <button class="btn-gold" id="btn-add-manual"><i data-lucide="user-plus"></i> Add Student</button>
             </div>
         </div>
 
-        <div class="dashboard-card table-responsive" style="background:white; border-radius:12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); overflow:hidden;">
-            <table class="data-table" style="width:100%; border-collapse:collapse;">
+        <div class="dashboard-card table-responsive" style="padding:0; overflow:hidden; border-radius:12px; box-shadow: var(--shadow-sm);">
+            <table class="data-table">
                 <thead>
-                    <tr style="background:#f8fafc; text-align:left;">
-                        <th style="padding:15px;">NAME & CLASSIFICATION</th>
-                        <th style="padding:15px;">ID NUMBER</th>
-                        <th style="padding:15px;">PROGRAM</th>
-                        <th style="padding:15px;">YEAR</th>
-                        <th style="padding:15px; text-align:right;">ACTIONS</th>
+                    <tr>
+                        <th>STUDENT NAME & CLASSIFICATION</th>
+                        <th>ID NUMBER</th>
+                        <th>COLLEGE</th>
+                        <th>COURSE / PROGRAM</th>
+                        <th>YEAR</th>
+                        <th style="text-align:right">ACTIONS</th>
                     </tr>
                 </thead>
                 <tbody id="student-list-body"></tbody>
             </table>
         </div>
 
-        <div id="pagination-controls" style="display:flex; justify-content:center; align-items:center; gap:20px; margin-top:25px;">
-            <button id="prev-btn" class="btn-navy" style="background:none; border:1px solid var(--hero-navy); color:var(--hero-navy); padding:8px 15px; border-radius:6px; cursor:pointer;">Previous</button>
-            <span id="page-indicator" style="font-weight:bold;">Page 1</span>
-            <button id="next-btn" class="btn-navy" style="background:none; border:1px solid var(--hero-navy); color:var(--hero-navy); padding:8px 15px; border-radius:6px; cursor:pointer;">Next</button>
+        <div style="display:flex; justify-content:center; align-items:center; gap:20px; margin:30px 0;">
+            <button id="prev-btn" class="btn-navy" style="background:transparent; border:1px solid var(--hero-navy); color:var(--hero-navy); padding:8px 20px; border-radius:8px; cursor:pointer;" disabled>
+                <i data-lucide="chevron-left" style="width:16px; vertical-align:middle;"></i> Previous
+            </button>
+            
+            <span id="page-indicator" style="font-weight:600; color:var(--hero-navy);">Page 1</span>
+            
+            <button id="next-btn" class="btn-navy" style="background:transparent; border:1px solid var(--hero-navy); color:var(--hero-navy); padding:8px 20px; border-radius:8px; cursor:pointer;">
+                Next <i data-lucide="chevron-right" style="width:16px; vertical-align:middle;"></i>
+            </button>
         </div>
     `;
 
     // Listeners
+    document.getElementById('btn-import-trigger').onclick = () => document.getElementById('file-import').click();
+    document.getElementById('file-import').onchange = handleFileUpload;
     document.getElementById('btn-add-manual').onclick = () => showStudentModal();
-    document.getElementById('prev-btn').onclick = () => { if(currentPage > 1) { currentPage--; loadStudents(); } };
-    document.getElementById('next-btn').onclick = () => { currentPage++; loadStudents(); };
+    document.getElementById('prev-btn').onclick = () => movePage(-1);
+    document.getElementById('next-btn').onclick = () => movePage(1);
     
     document.getElementById('student-search').oninput = (e) => {
-        currentSearch = e.target.value.trim();
-        currentPage = 1;
+        currentSearch = e.target.value.trim().toUpperCase();
+        resetPagination();
         loadStudents();
     };
 
@@ -74,107 +106,232 @@ export async function initStudents() {
 }
 
 /**
- * DATA FETCHING (Now calling Google Sheets)
+ * PAGINATION HELPERS
  */
-async function loadStudents() {
-    const tbody = document.getElementById('student-list-body');
-    const indicator = document.getElementById('page-indicator');
-    
-    tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:30px;'>Fetching from Cloud Sheets...</td></tr>";
-
-    // Gagamit tayo ng 'SEARCH_STUDENTS' action sa Apps Script
-    const response = await dbRequest("SEARCH_STUDENTS", { 
-        query: currentSearch,
-        page: currentPage 
-    });
-
-    if (response.status === "success") {
-        renderTable(response.data);
-        indicator.innerText = `Page ${currentPage}`;
-    } else {
-        tbody.innerHTML = `<tr><td colspan='5' style='text-align:center; color:red; padding:30px;'>${response.msg}</td></tr>`;
-    }
+function resetPagination() {
+    currentPage = 0;
+    pageStack = [];
+    lastVisible = null;
 }
 
-function renderTable(students) {
-    const tbody = document.getElementById('student-list-body');
-    tbody.innerHTML = "";
-
-    if (students.length === 0) {
-        tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:30px;'>No records found.</td></tr>";
-        return;
+async function movePage(direction) {
+    if (direction === 1) {
+        pageStack.push(lastVisible);
+        currentPage++;
+    } else {
+        pageStack.pop();
+        currentPage--;
+        lastVisible = pageStack[pageStack.length - 1] || null;
     }
-
-    students.forEach(s => {
-        const classification = getClassification(s.program);
-        const row = document.createElement('tr');
-        row.style.borderBottom = "1px solid #f1f5f9";
-        row.innerHTML = `
-            <td style="padding:15px;">
-                <b style="color:var(--hero-navy);">${s.name}</b><br>
-                <small style="color:var(--hero-gold); font-weight:bold; font-size:10px;">${classification}</small>
-            </td>
-            <td style="padding:15px;"><b>${s.id}</b></td>
-            <td style="padding:15px;"><span style="background:#f1f5f9; padding:4px 8px; border-radius:5px; font-size:12px;">${s.program}</span></td>
-            <td style="padding:15px;">Year ${s.year}</td>
-            <td style="padding:15px; text-align:right;">
-                <button onclick="editStudent('${s.id}')" style="background:none; border:none; color:var(--hero-navy); cursor:pointer; margin-right:10px;">Edit</button>
-                <button onclick="deleteStudent('${s.id}')" style="background:none; border:none; color:red; cursor:pointer;">Delete</button>
-            </td>
-        `;
-        tbody.appendChild(row);
-    });
+    loadStudents();
 }
 
 /**
- * MODAL & ACTIONS
+ * DATA FETCHING
+ */
+async function loadStudents() {
+    const tbody = document.getElementById('student-list-body');
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const indicator = document.getElementById('page-indicator');
+    
+    tbody.innerHTML = "<tr><td colspan='6' style='text-align:center; padding:20px;'>Loading Records...</td></tr>";
+
+    try {
+        let constraints = [orderBy("fullName"), limit(PAGE_SIZE)];
+
+        if (currentSearch) {
+            constraints = [
+                where("fullName", ">=", currentSearch),
+                where("fullName", "<=", currentSearch + "\uf8ff"),
+                orderBy("fullName"),
+                limit(PAGE_SIZE)
+            ];
+        }
+
+        if (currentPage > 0 && pageStack.length > 0) {
+            const startDoc = pageStack[pageStack.length - 1];
+            constraints.push(startAfter(startDoc));
+        }
+
+        const q = query(collection(db, "students"), ...constraints);
+        const snapshot = await getDocs(q);
+        
+        tbody.innerHTML = "";
+        
+        if (snapshot.empty) {
+            tbody.innerHTML = "<tr><td colspan='6' style='text-align:center; padding:20px;'>No students found.</td></tr>";
+            nextBtn.disabled = true;
+            return;
+        }
+
+        lastVisible = snapshot.docs[snapshot.docs.length - 1];
+        indicator.innerText = `Page ${currentPage + 1}`;
+        prevBtn.disabled = currentPage === 0;
+        nextBtn.disabled = snapshot.docs.length < PAGE_SIZE;
+
+        snapshot.forEach(docSnap => {
+            const s = docSnap.data();
+            const classification = getClassification(s.program); // Automatic Classification
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>
+                    <b style="text-transform: uppercase;">${sanitize(s.fullName)}</b><br>
+                    <small style="color:var(--hero-gold); font-weight:800; font-size:10px;">${classification}</small>
+                </td>
+                <td><b>${sanitize(s.studentId)}</b></td>
+                <td>${sanitize(s.college)}</td>
+                <td><span class="badge" style="background:#f1f5f9; color:var(--hero-navy); border:1px solid #e2e8f0; font-weight:700;">${sanitize(s.program)}</span></td>
+                <td>${sanitize(s.yearLevel)}</td>
+                <td style="text-align:right">
+                    <button class="btn-edit" data-id="${docSnap.id}" style="border:none; background:none; color:var(--hero-navy); cursor:pointer;"><i data-lucide="edit-3" style="width:18px"></i></button>
+                    <button class="btn-delete" data-id="${docSnap.id}" style="border:none; background:none; color:#ef4444; cursor:pointer; margin-left:12px;"><i data-lucide="trash-2" style="width:18px"></i></button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+
+        attachActionListeners();
+        lucide.createIcons();
+    } catch (e) { 
+        console.error("Load Error:", e);
+        tbody.innerHTML = "<tr><td colspan='6' style='text-align:center; color:red;'>Error loading data. Check Firestore Indexes.</td></tr>";
+    }
+}
+
+/**
+ * MODAL: ADD/EDIT
  */
 async function showStudentModal(studentId = null) {
-    // Gagamit tayo ng Swal (SweetAlert2) gaya ng dati mong code
+    let s = { studentId: '', fullName: '', college: '', program: '', yearLevel: '' };
+    
+    if (studentId) {
+        const snap = await getDoc(doc(db, "students", studentId));
+        if (snap.exists()) s = snap.data();
+    }
+
     const { value: formValues } = await Swal.fire({
-        title: studentId ? 'EDIT STUDENT' : 'ADD STUDENT',
+        title: `<span style="font-weight:800; color:var(--hero-navy)">${studentId ? 'EDIT STUDENT' : 'ADD NEW STUDENT'}</span>`,
         html: `
-            <input id="swal-id" class="swal2-input" placeholder="ID Number" value="${studentId || ''}" ${studentId ? 'readonly' : ''}>
-            <input id="swal-name" class="swal2-input" placeholder="Full Name">
-            <input id="swal-program" class="swal2-input" placeholder="Program (e.g. BTLED)">
-            <input id="swal-year" class="swal2-input" placeholder="Year Level">
+            <div style="text-align:left;">
+                <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">ID NUMBER</label>
+                <input id="swal-id" class="swal2-input" style="margin:0 0 15px 0; width:100%;" value="${sanitize(s.studentId)}" ${studentId ? 'readonly' : ''}>
+                
+                <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">FULL NAME</label>
+                <input id="swal-name" class="swal2-input" style="margin:0 0 15px 0; width:100%; text-transform:uppercase;" value="${sanitize(s.fullName)}">
+                
+                <div style="display:flex; gap:10px; margin-bottom:15px;">
+                    <div style="flex:1">
+                        <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">COLLEGE</label>
+                        <input id="swal-college" class="swal2-input" style="margin:0; width:100%;" value="${sanitize(s.college)}">
+                    </div>
+                    <div style="flex:1">
+                        <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">YEAR LEVEL</label>
+                        <input id="swal-year" class="swal2-input" style="margin:0; width:100%;" value="${sanitize(s.yearLevel)}">
+                    </div>
+                </div>
+
+                <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px;">COURSE / PROGRAM</label>
+                <input id="swal-program" class="swal2-input" placeholder="e.g. BTLED" style="margin:0; width:100%; text-transform:uppercase;" value="${sanitize(s.program)}">
+            </div>
         `,
-        confirmButtonColor: '#000080',
+        showCancelButton: true,
+        confirmButtonText: 'Save Record',
+        confirmButtonColor: '#001a3d',
         preConfirm: () => {
+            const sid = document.getElementById('swal-id').value.trim();
+            const fname = document.getElementById('swal-name').value.trim().toUpperCase();
+            if (!sid || !fname) return Swal.showValidationMessage('ID and Name are required');
+            
             return {
-                studentId: document.getElementById('swal-id').value,
-                name: document.getElementById('swal-name').value.toUpperCase(),
-                program: document.getElementById('swal-program').value.toUpperCase(),
-                year: document.getElementById('swal-year').value
+                studentId: sid,
+                fullName: fname,
+                college: document.getElementById('swal-college').value.trim().toUpperCase(),
+                program: document.getElementById('swal-program').value.trim().toUpperCase(),
+                yearLevel: document.getElementById('swal-year').value.trim()
             }
         }
     });
 
     if (formValues) {
-        Swal.fire({ title: 'Saving...', didOpen: () => Swal.showLoading() });
-        const res = await dbRequest("SAVE_STUDENT", formValues);
-        if (res.status === "success") {
-            Swal.fire('Saved!', '', 'success');
+        try {
+            await updateDoc(doc(db, "students", formValues.studentId), formValues).catch(async () => {
+                await writeBatch(db).set(doc(db, "students", formValues.studentId), { ...formValues, balance: 0 }).commit();
+            });
+            Swal.fire({ icon: 'success', title: 'Saved!', timer: 1500, showConfirmButton: false });
             loadStudents();
-        } else {
-            Swal.fire('Error', res.msg, 'error');
-        }
+        } catch (e) { Swal.fire('Error', e.message, 'error'); }
     }
 }
 
-// Gawing global para matawag ng onclick sa HTML strings
-window.editStudent = (id) => showStudentModal(id);
-window.deleteStudent = async (id) => {
-    const confirm = await Swal.fire({
-        title: 'Delete student?',
-        text: "This will remove them from the Cloud Sheet.",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#d33'
+/**
+ * ROW ACTIONS
+ */
+function attachActionListeners() {
+    document.querySelectorAll('.btn-delete').forEach(btn => {
+        btn.onclick = async (e) => {
+            const id = e.currentTarget.dataset.id;
+            const res = await Swal.fire({
+                title: 'Delete Student?',
+                text: `Permanent removal of ${id}.`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                confirmButtonText: 'Yes, Delete'
+            });
+            if (res.isConfirmed) {
+                await deleteDoc(doc(db, "students", id));
+                loadStudents();
+            }
+        };
     });
-    
-    if (confirm.isConfirmed) {
-        const res = await dbRequest("DELETE_STUDENT", { studentId: id });
-        if(res.status === "success") loadStudents();
-    }
+
+    document.querySelectorAll('.btn-edit').forEach(btn => {
+        btn.onclick = (e) => showStudentModal(e.currentTarget.dataset.id);
+    });
+}
+
+/**
+ * EXCEL IMPORT
+ */
+async function handleFileUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    Swal.fire({ title: 'Importing...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+            const batch = writeBatch(db);
+            
+            jsonData.forEach(row => {
+                const id = String(row['ID NUMBER'] || row.Id || row.ID || row['Student ID'] || "").trim();
+                const name = String(row['STUDENT NAME'] || row['Student Name'] || row.Name || row['Full Name'] || "").trim();
+                const prog = String(row['COURSE/PROGRAM'] || row['Course/Program'] || row.Course || row.Program || "").trim();
+
+                if (id && name) {
+                    batch.set(doc(db, "students", id), {
+                        studentId: id,
+                        fullName: name.toUpperCase(),
+                        college: String(row.COLLEGE || row.College || "").trim().toUpperCase(),
+                        program: prog.toUpperCase(),
+                        yearLevel: String(row.YEAR || row['Year Level'] || row.Year || "").trim(),
+                        balance: 0,
+                        lastUpdated: new Date().toISOString()
+                    });
+                }
+            });
+            await batch.commit();
+            Swal.fire('Import Success', 'Data synced.', 'success');
+            resetPagination();
+            loadStudents();
+        } catch (err) { Swal.fire('Error', err.message, 'error'); }
+    };
+    reader.readAsArrayBuffer(file);
+    event.target.value = ""; 
 }
